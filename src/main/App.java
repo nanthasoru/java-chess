@@ -4,7 +4,7 @@ import javax.swing.JFrame;
 
 public final class App implements Runnable
 {
-    private static JFrame gameFrame = new JFrame();
+    private static JFrame gameFrame = new JFrame("chess");
     public static Panel gamePanel;
 
     private static Thread beta = new Thread(new App());
@@ -25,8 +25,9 @@ public final class App implements Runnable
         Inputs inputs = new Inputs();
         gamePanel.addMouseListener(inputs);
         gamePanel.addMouseMotionListener(inputs);
-
-        gameFrame.requestFocus();
+        gamePanel.requestFocus();
+        
+        gameFrame.setLocationRelativeTo(null);
         gameFrame.setResizable(false);
         gameFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         gameFrame.setVisible(true);

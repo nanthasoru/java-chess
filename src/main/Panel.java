@@ -13,6 +13,7 @@ import javax.imageio.ImageIO;
 import javax.swing.JPanel;
 
 import coregame.Board;
+import coregame.Coordinate;
 import coregame.Piece;
 
 class Panel extends JPanel{
@@ -121,9 +122,11 @@ class Panel extends JPanel{
             moves = board.getMoves(square);
             lastSquare = square;
         } else if (moves != null && moves.contains(square)) {
+
+            // Moving piece handling
             board.movePiece(lastSquare, square);
             moves = null;
-        } else {
+        } else if (square != lastSquare) {
             moves = null;
         }
     }

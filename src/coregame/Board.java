@@ -4,14 +4,12 @@ import java.util.LinkedList;
 
 public class Board {
 
-    private final static LinkedList<Integer> fileACoordinates, fileHCoordinates, fileABCoordinates, fileGHCoordinates;
-    
     private int[] board;
     
     private boolean whiteTurn;
-    private boolean[] castleRights;
+    private boolean[] castleRights, enPassant;
     private Coordinate lastMove;
-    private int halfMove, fullMove;
+    private int halfMove, fullMove, lastEnPassantSquare;
 
     public Board(String fen)
     {
@@ -24,7 +22,6 @@ public class Board {
         }
 
         board = new int[64];
-        castleRights = new boolean[4];
 
         int rank = 0, file = 0;
 
@@ -45,11 +42,31 @@ public class Board {
             }
         }
 
+        castleRights = new boolean[2];
+
         try {
             whiteTurn = parsed[1].equals("w");
 
-            for (int i = 0; i < 4; i++) {
-                castleRights[i] = parsed[2].charAt(i) != '-';
+            // Castle eval
+            String castleFen = parsed[2];
+            int castleLength = castleFen.length();
+
+            if (castleLength == 4 && castleFen.equals("KQkq"))
+            {
+                castleRights[0] = true;
+                castleRights[1] = true;
+            }
+            else if (castleLength == 2)
+            {
+                castleRights[castleFen.equals(castleFen.toUpperCase()) ? 0 : 1] = true;
+            }
+            else if (castleLength == 1 && castleFen.equals("-"))
+            {
+                // The rights are set false by default
+            }
+            else
+            {
+                throw new Exception();
             }
 
             if (!parsed[3].equals("-")) {
@@ -58,11 +75,12 @@ public class Board {
 
             halfMove = Integer.parseInt(parsed[4]);
             fullMove = Integer.parseInt(parsed[5]);
-
         }
         catch(Exception e) {
             throw wrongFen;
         }
+
+        enPassant = new boolean[64];
     }
 
     public Board() {
@@ -77,39 +95,63 @@ public class Board {
         return index >= 0 && index < 64;
     }
 
-
     public LinkedList<Integer> getMoves(int square)
     {
+        LinkedList<Integer> error = new LinkedList<>();
+
+        if (whiteTurn ^ Piece.isWhite(board[square])) return error;
+
         int piece = Piece.removeColorFromData(board[square]);
 
         return switch (piece)
         {
-            case Piece.PAWN   -> getPawnMoves(square, piece == board[square] ? Piece.BLACK : Piece.WHITE);
+            case Piece.PAWN   -> getPawnMoves(square);
             case Piece.KNIGHT -> getKnightMoves(square);
             case Piece.KING   -> getKingMoves(square);
             case Piece.BISHOP -> getBishopMoves(square);
             case Piece.ROOK   -> getRookMoves(square);
             case Piece.QUEEN  -> getQueenMoves(square);
-            default -> new LinkedList<>();
+            default           -> error;
         };
     }
 
-    private LinkedList<Integer> getPawnMoves(int square, int color)
-    {
+    private LinkedList<Integer> getPawnMoves(int square) {
         LinkedList<Integer> pawnMoves = new LinkedList<>();
-        int nextSquare = 0;
+
         int piece = board[square];
-
-        boolean isWhite = color == Piece.WHITE;
-        int d = isWhite ? -1 : 1;
-
-        nextSquare = square + 7*d;
-        if ((!isWhite && !fileHCoordinates.contains(nextSquare) || isWhite && !fileACoordinates.contains(nextSquare)) && valid(nextSquare) && board[nextSquare] != 0 && !Piece.sameTeam(board[nextSquare], piece)) pawnMoves.push(nextSquare);
-        nextSquare += d;
-        if (valid(nextSquare) && board[nextSquare] == 0) pawnMoves.push(nextSquare);
-        nextSquare += d;
-        if ((!isWhite && !fileACoordinates.contains(nextSquare) || isWhite && !fileHCoordinates.contains(nextSquare)) && valid(nextSquare) && board[nextSquare] != 0 && !Piece.sameTeam(board[nextSquare], piece)) pawnMoves.push(nextSquare);
-
+        boolean isWhite = Piece.isWhite(piece);
+    
+        int d = isWhite ? -8 : 8;
+        int startRank = isWhite ? 6 : 1;
+    
+        int step = square + d;
+        if (valid(step) && board[step] == 0)
+        {
+            pawnMoves.push(step);
+    
+            step += d;
+            if ((square / 8) == startRank && board[step] == 0)
+                pawnMoves.push(step);
+        }
+        
+        for (int offset : new int[]{d - 1, d + 1})
+        {
+            int target = square + offset;
+    
+            boolean onLeftEdge = (square % 8 == 0);
+            boolean onRightEdge = (square % 8 == 7);
+    
+            if ((offset == d - 1 && !onLeftEdge) || (offset == d + 1 && !onRightEdge))
+            {
+                if (valid(target))
+                {
+                    int targetPiece = board[target];
+                    if ((targetPiece != 0 && !Piece.sameTeam(piece, targetPiece)) || enPassant[target])
+                        pawnMoves.push(target);
+                }
+            }
+        }
+    
         return pawnMoves;
     }
 
@@ -121,21 +163,21 @@ public class Board {
         int piece = board[square];
 
         nextSquare = square - 6;
-        if (valid(nextSquare) && !fileABCoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 0 && nextSquare%8 != 1 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square + 6;
-        if (valid(nextSquare) && !fileGHCoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 6 && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square - 10;
-        if (valid(nextSquare) && !fileGHCoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 6 && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square + 10;
-        if (valid(nextSquare) && !fileABCoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 0 && nextSquare%8 != 1 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square - 15;
-        if (valid(nextSquare) && !fileACoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square + 15;
-        if (valid(nextSquare) && !fileHCoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square - 17;
-        if (valid(nextSquare) && !fileHCoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square + 17;
-        if (valid(nextSquare) && !fileACoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
 
         return knightMoves;
     }
@@ -147,17 +189,17 @@ public class Board {
         int piece = board[square];
 
         nextSquare = square + 1;
-        if (valid(nextSquare) && !fileACoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
         nextSquare = square - 1;
-        if (valid(nextSquare) && !fileACoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
         nextSquare = square + 7;
-        if (valid(nextSquare) && !fileACoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
         nextSquare = square - 7;
-        if (valid(nextSquare) && !fileACoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
         nextSquare = square + 9;
-        if (valid(nextSquare) && !fileACoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
         nextSquare = square - 9;
-        if (valid(nextSquare) && !fileACoordinates.contains(nextSquare) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if (valid(nextSquare) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
 
         nextSquare = square + 8;
         if (valid(nextSquare) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
@@ -263,24 +305,31 @@ public class Board {
     {
         board[squareD] = board[squareB];
         board[squareB] = 0;
-    }
 
-    static
-    {
-        fileACoordinates  = new LinkedList<>();
-        fileHCoordinates  = new LinkedList<>();
-        fileABCoordinates = new LinkedList<>();
-        fileGHCoordinates = new LinkedList<>();
+        // Initialize var for possible en passant
+        int d = Piece.isWhite(board[squareD]) ? -1 : 1;
+        boolean isPawn = Piece.removeColorFromData(board[squareD]) == Piece.PAWN;
+        int enPassantTarget = squareD + 8 * -d;
 
-        for (int i = 0; i < 8; i++)
+        if (lastEnPassantSquare == squareD && isPawn) board[enPassantTarget] = 0;
+
+        // Resets any possible en passant
+        enPassant[lastEnPassantSquare] = false;
+
+        // Checking if there is a future en passant ?
+        if (isPawn && squareD == squareB + 16 * d)
         {
-            int r = i * 8;
-            fileACoordinates.push(r);
-            fileHCoordinates.push(r + 7);
-            fileABCoordinates.push(r);
-            fileABCoordinates.push(r + 1);
-            fileGHCoordinates.push(r + 6);
-            fileGHCoordinates.push(r + 7);
+            lastEnPassantSquare = enPassantTarget;
+            enPassant[enPassantTarget] = true;
         }
+
+
+        // Checking for pawn promotion
+        d = (d == -1 ? 0 : 7);
+
+        if (isPawn && squareD/8 == d) board[squareD] = Piece.QUEEN - (d == 0 ? Piece.WHITE : Piece.BLACK);
+
+        if (!whiteTurn) fullMove++;
+        whiteTurn = !whiteTurn;
     }
 }

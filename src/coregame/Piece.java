@@ -27,4 +27,9 @@ public class Piece {
         return p1 == 0 || p2 == 0 || !sameTeam(p1, p2);
     }
 
+    public static boolean isWhite(int piece)
+    {
+        return Character.isUpperCase(piece);
+    }
+
 }
