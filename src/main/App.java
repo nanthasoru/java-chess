@@ -4,21 +4,39 @@ import javax.swing.JFrame;
 
 public final class App implements Runnable
 {
-    private static JFrame gameFrame = new JFrame("chess");
+
+    private boolean running;
+
+    private static JFrame gameFrame;
     public static Panel gamePanel;
 
-    private static Thread beta = new Thread(new App());
+    private static App sub;
+    private static Thread beta;
 
-    private App() {}
-
-    static void build(String fen)
+    private App()
     {
-        if (beta.isAlive()) {
-            return;
+        running = true;
+    }
+
+    static void build(String fen) throws IllegalArgumentException
+    {
+        if (beta != null && beta.isAlive())
+        {
+            System.out.println("Rebuilding on existing app, closing first.");
+            App.close();
         }
 
-        gamePanel = new Panel(fen);
+        try {
+            gamePanel = new Panel(fen);
+        } catch (IllegalArgumentException e) {
+            gamePanel = null;
+            throw new IllegalArgumentException();
+        }
 
+        sub = new App();
+        beta = new Thread(sub);
+        
+        gameFrame = new JFrame("chess");
         gameFrame.add(gamePanel);
         gameFrame.pack();
 
@@ -29,10 +47,35 @@ public final class App implements Runnable
         
         gameFrame.setLocationRelativeTo(null);
         gameFrame.setResizable(false);
-        gameFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        gameFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         gameFrame.setVisible(true);
 
         beta.start();
+    }
+
+    static void setHighlight(boolean choice)
+    {
+        if (gamePanel != null)
+            gamePanel.setAttacksHighlight(choice);
+    }
+
+    public static String getFen()
+    {
+        return gamePanel != null ? gamePanel.getFen() : null;
+    }
+
+    static void close()
+    {
+        if (sub != null && beta != null && gameFrame != null && gamePanel != null && beta.isAlive())
+        {
+            sub.running = false;
+            gameFrame.remove(gamePanel);
+            gameFrame.dispose();
+            gamePanel = null;
+            sub = null;
+            beta = null;
+            gameFrame = null;
+        }
     }
 
     @Override
@@ -41,7 +84,7 @@ public final class App implements Runnable
         double timePerFrame = 1000000000/60;
         long lastFrame = 0;
 
-        while (true)
+        while (running)
         {
             long now = System.nanoTime();
             if (now - lastFrame >= timePerFrame) {

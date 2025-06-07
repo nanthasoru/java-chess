@@ -7,18 +7,23 @@ public class Board {
     private int[] board;
     
     private boolean whiteTurn;
-    private boolean[] castleRights, enPassant;
-    private Coordinate lastMove;
-    private int halfMove, fullMove, lastEnPassantSquare;
+    private boolean[] castleRights;
+    private Coordinate activeEnPassant;
+    private int halfMove, fullMove;
 
-    public Board(String fen)
+    private static final LinkedList<Integer> NULL_LIST = new LinkedList<>();
+    private static final String DEFAULT_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", castlingNotation = "KQkq";
+
+    public Board(String fen) throws IllegalArgumentException
     {
-        String[] parsed = fen.split(" ");
 
-        IllegalArgumentException wrongFen = new IllegalArgumentException("Illegal Forsyth-Edwards Notation format");
+        if (fen == null) fen = DEFAULT_FEN;
+
+        String[] parsed = fen.split(" ");
+        String errorMessage = "Illegal Forsyth-Edwards Notation format";
 
         if (parsed.length != 6) {
-            throw wrongFen;
+            throw new IllegalArgumentException(errorMessage);
         }
 
         board = new int[64];
@@ -37,12 +42,12 @@ public class Board {
                 } else if (Character.isDigit(sym)) {
                     file += Character.getNumericValue(sym);
                 } else {
-                    throw wrongFen;
+                    throw new IllegalArgumentException(errorMessage);
                 }
             }
         }
 
-        castleRights = new boolean[2];
+        castleRights = new boolean[4];
 
         try {
             whiteTurn = parsed[1].equals("w");
@@ -51,40 +56,32 @@ public class Board {
             String castleFen = parsed[2];
             int castleLength = castleFen.length();
 
-            if (castleLength == 4 && castleFen.equals("KQkq"))
+            if (castleLength < 0 || castleLength > 4) throw new IllegalArgumentException(errorMessage);
+
+            else if (!(castleLength == 1 && castleFen.equals("-")))
             {
-                castleRights[0] = true;
-                castleRights[1] = true;
-            }
-            else if (castleLength == 2)
-            {
-                castleRights[castleFen.equals(castleFen.toUpperCase()) ? 0 : 1] = true;
-            }
-            else if (castleLength == 1 && castleFen.equals("-"))
-            {
-                // The rights are set false by default
-            }
-            else
-            {
-                throw new Exception();
+                for (int i = 0; i < castleLength; i++)
+                {
+                    char sym = castleFen.charAt(i);
+                    int index = castlingNotation.indexOf(sym);
+
+                    if (index != -1)
+                        castleRights[index] = true;
+                    else
+                        throw new IllegalArgumentException(errorMessage);
+                }
             }
 
             if (!parsed[3].equals("-")) {
-                lastMove = Coordinate.valueOf(parsed[3]);
+                activeEnPassant = Coordinate.valueOf(parsed[3]);
             }
 
             halfMove = Integer.parseInt(parsed[4]);
             fullMove = Integer.parseInt(parsed[5]);
         }
         catch(Exception e) {
-            throw wrongFen;
+            e.printStackTrace();
         }
-
-        enPassant = new boolean[64];
-    }
-
-    public Board() {
-        this("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     }
 
     public int get(int index) {
@@ -97,9 +94,7 @@ public class Board {
 
     public LinkedList<Integer> getMoves(int square)
     {
-        LinkedList<Integer> error = new LinkedList<>();
-
-        if (whiteTurn ^ Piece.isWhite(board[square])) return error;
+        if (whiteTurn ^ Piece.isWhite(board[square])) return NULL_LIST;
 
         int piece = Piece.removeColorFromData(board[square]);
 
@@ -111,7 +106,7 @@ public class Board {
             case Piece.BISHOP -> getBishopMoves(square);
             case Piece.ROOK   -> getRookMoves(square);
             case Piece.QUEEN  -> getQueenMoves(square);
-            default           -> error;
+            default           -> NULL_LIST;
         };
     }
 
@@ -146,7 +141,7 @@ public class Board {
                 if (valid(target))
                 {
                     int targetPiece = board[target];
-                    if ((targetPiece != 0 && !Piece.sameTeam(piece, targetPiece)) || enPassant[target])
+                    if ((targetPiece != 0 && !Piece.sameTeam(piece, targetPiece)) || (activeEnPassant != null && activeEnPassant.ordinal() == target))
                         pawnMoves.push(target);
                 }
             }
@@ -205,6 +200,27 @@ public class Board {
         if (valid(nextSquare) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
         nextSquare = square - 8;
         if (valid(nextSquare) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+
+        // Castle moves
+
+        boolean isWhite = Piece.isWhite(piece);
+
+        if (isWhite ? castleRights[0] || castleRights[1] : castleRights[2] || castleRights[3] && square%8 == 4)
+        {
+            if (isWhite ? castleRights[0] : castleRights[2])
+                for (nextSquare = square + 1; nextSquare%8 != 7; nextSquare++)
+                {
+                    if (board[nextSquare] != 0) break;
+                    if (nextSquare%8 == 6 && Piece.removeColorFromData(board[nextSquare+1]) == Piece.ROOK && Piece.sameTeam(board[nextSquare+1], board[square])) kingMoves.push(nextSquare);
+                }
+
+            if (isWhite ? castleRights[1] : castleRights[3])
+                for (nextSquare = square - 1; nextSquare%8 != 0; nextSquare--)
+                {
+                    if (board[nextSquare] != 0) break;
+                    if (nextSquare%8 == 1 && Piece.removeColorFromData(board[nextSquare-1]) == Piece.ROOK && Piece.sameTeam(board[nextSquare-1], board[square])) kingMoves.push(nextSquare);
+                }
+        }
 
         return kingMoves;
     }
@@ -301,35 +317,102 @@ public class Board {
         return queenMoves;
     }
 
+    public String getFen()
+    {
+        String fen = "";
+        int blank = 0;
+
+        for (int square = 0; square < 64; square++)
+        {
+            int piece = board[square];
+            
+            if (square % 8 == 0 && square != 0)
+            {
+                fen += (blank == 0 ? "" : blank) + "/";
+                blank = 0;
+            }
+            
+            if (piece != 0)
+            {
+                fen += (blank == 0 ? "" : blank) + "" + (char)piece;
+                if (blank != 0) blank = 0;
+            }
+
+            if (piece == 0) blank++;
+        }
+
+        fen += " " + (whiteTurn ? "w" : "b") + " ";
+
+        for (int i = 0; i < 4; i++)
+            fen += castleRights[i] ? castlingNotation.charAt(i) : "";
+        
+        fen += " " + (activeEnPassant == null ? "-" : activeEnPassant.name()) + " " + halfMove + " " + fullMove;
+
+        return fen;
+    }
+
     public void movePiece(int squareB, int squareD)
     {
+        halfMove++;
+        if (board[squareD] != 0) halfMove = 0;
+
         board[squareD] = board[squareB];
         board[squareB] = 0;
 
-        // Initialize var for possible en passant
-        int d = Piece.isWhite(board[squareD]) ? -1 : 1;
-        boolean isPawn = Piece.removeColorFromData(board[squareD]) == Piece.PAWN;
+        int rawPiece = Piece.removeColorFromData(board[squareD]);
+        boolean isWhite = Piece.isWhite(board[squareD]);
+        int d;
+        
+        /* KING MANAGEMENT : CASTLING */
+        if (isWhite ? (castleRights[0] || castleRights[1]) : (castleRights[2] || castleRights[3]))
+        {
+            int rank = squareD/8;
+            int file = squareD%8;
+
+            if (rawPiece == Piece.ROOK)
+            {
+                castleRights[isWhite ? (file == 6 ? 0 : 1) : (file == 1 ? 2 : 3)] = false;
+            }
+
+            if (rawPiece == Piece.KING)
+            {
+
+                if (file == 1 || file == 6)
+                {
+                    d = file == 6 ? 7 : 0;
+                    board[rank * 8 + (file == 6 ? 5 : 2)] = board[rank * 8 + d];
+                    board[rank * 8 + d] = 0;
+                }
+                
+                d = isWhite ? 0 : 1;
+
+                castleRights[0 + d] = false;
+                castleRights[1 + d] = false;
+            }
+        }
+        
+        /* PAWN MANAGEMENT : EN PASSANT AND PROMOTION */
+        
+        boolean isPawn = rawPiece == Piece.PAWN;
+        d = isWhite ? -1 : 1;
         int enPassantTarget = squareD + 8 * -d;
 
-        if (lastEnPassantSquare == squareD && isPawn) board[enPassantTarget] = 0;
+        if (activeEnPassant != null && activeEnPassant.ordinal() == squareD && isPawn)
+            board[enPassantTarget] = 0;
 
-        // Resets any possible en passant
-        enPassant[lastEnPassantSquare] = false;
+        activeEnPassant = null;
 
-        // Checking if there is a future en passant ?
         if (isPawn && squareD == squareB + 16 * d)
-        {
-            lastEnPassantSquare = enPassantTarget;
-            enPassant[enPassantTarget] = true;
-        }
+            activeEnPassant = Coordinate.coordinateOf(enPassantTarget);
 
-
-        // Checking for pawn promotion
         d = (d == -1 ? 0 : 7);
 
         if (isPawn && squareD/8 == d) board[squareD] = Piece.QUEEN - (d == 0 ? Piece.WHITE : Piece.BLACK);
 
+        /* NEXT TURN */
+
         if (!whiteTurn) fullMove++;
+        if (isPawn) halfMove = 0;
         whiteTurn = !whiteTurn;
     }
 }

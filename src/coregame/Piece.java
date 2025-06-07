@@ -29,7 +29,7 @@ public class Piece {
 
     public static boolean isWhite(int piece)
     {
-        return Character.isUpperCase(piece);
+        return piece == 0 ? false : (piece & WHITE) == 0;
     }
 
 }

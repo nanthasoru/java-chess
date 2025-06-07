@@ -13,7 +13,6 @@ import javax.imageio.ImageIO;
 import javax.swing.JPanel;
 
 import coregame.Board;
-import coregame.Coordinate;
 import coregame.Piece;
 
 class Panel extends JPanel{
@@ -24,16 +23,18 @@ class Panel extends JPanel{
     private BufferedImage lastImage;
     private final Board board;
     private LinkedList<Integer> moves;
+    private boolean attacksHighlight;
 
 
     private boolean slide;
 
-    Panel(String fen)
+    Panel(String fen) throws IllegalArgumentException
     {
         super();
         setPreferredSize(new Dimension(800, 800));
 
-        board = (fen == null) ? new Board() : new Board(fen);
+        attacksHighlight = true;
+        board = new Board(fen);
     }
 
     public void setSlide(boolean slide) {
@@ -42,6 +43,10 @@ class Panel extends JPanel{
 
     public void setXY(int x, int y) {
         this.x = x; this.y = y;
+    }
+
+    public void setAttacksHighlight(boolean attacksHighlight) {
+        this.attacksHighlight = attacksHighlight;
     }
 
     @Override
@@ -66,7 +71,7 @@ class Panel extends JPanel{
 
                 g.drawImage(image, file * 100, rank * 100, 100, 100, null);
 
-                if (moves != null && moves.contains(square))
+                if (attacksHighlight && moves != null && moves.contains(square))
                 {
                     g.setColor(RED);
                     g.fillRect(file * 100, rank * 100, 100, 100);
@@ -75,7 +80,7 @@ class Panel extends JPanel{
         }
 
         if (slide) {
-            if (lastImage == null) lastImage =  evalImage(board.get(lastSquare));
+            if (lastImage == null) lastImage = evalImage(board.get(lastSquare));
             g.drawImage(lastImage, x - 50, y - 50, 100, 100, null);
         }
 
@@ -129,6 +134,11 @@ class Panel extends JPanel{
         } else if (square != lastSquare) {
             moves = null;
         }
+    }
+
+    String getFen()
+    {
+        return board.getFen();
     }
 
     static
