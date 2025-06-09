@@ -17,23 +17,28 @@ import coregame.Piece;
 
 class Panel extends JPanel{
 
-    private final static Color BEIGE = new Color(250, 235, 195), BROWN = new Color(204, 138, 94), RED = new Color(235, 64, 52, 150);
+    private final static Color
+        BEIGE = new Color(250, 235, 195),
+        BROWN = new Color(204, 138, 94),
+        RED = new Color(235, 64, 52, 150),
+        GREEN = new Color(121, 232, 150, 150);
+
     private final static BufferedImage[] pieceImages = new BufferedImage[12];
+    private final App password;
+
     private int lastSquare, x, y;
     private BufferedImage lastImage;
-    private final Board board;
+    private Board board;
     private LinkedList<Integer> moves;
-    private boolean attacksHighlight;
+    private boolean attacksHighlight, slide, kingHighlight;
 
-
-    private boolean slide;
-
-    Panel(String fen) throws IllegalArgumentException
+    Panel(String fen, App key) throws IllegalArgumentException
     {
         super();
         setPreferredSize(new Dimension(800, 800));
-
+        password = key;
         attacksHighlight = true;
+        kingHighlight = false;
         board = new Board(fen);
     }
 
@@ -47,6 +52,14 @@ class Panel extends JPanel{
 
     public void setAttacksHighlight(boolean attacksHighlight) {
         this.attacksHighlight = attacksHighlight;
+    }
+
+    public void setKingHighlight(boolean kingHighlight) {
+        this.kingHighlight = kingHighlight;
+    }
+
+    public Board getBoard(App key) {
+        return (key == password) ? board : null;
     }
 
     @Override
@@ -74,6 +87,12 @@ class Panel extends JPanel{
                 if (attacksHighlight && moves != null && moves.contains(square))
                 {
                     g.setColor(RED);
+                    g.fillRect(file * 100, rank * 100, 100, 100);
+                }
+
+                if (kingHighlight && (board.getBlackKingSquare() == square || board.getWhiteKingSquare() == square))
+                {
+                    g.setColor(GREEN);
                     g.fillRect(file * 100, rank * 100, 100, 100);
                 }
             }
@@ -124,21 +143,16 @@ class Panel extends JPanel{
         int square = y/100 * 8 + x/100;
 
         if (moves == null && board.get(square) != 0) {
-            moves = board.getMoves(square);
+            moves = board.getLegalMoves(square);
             lastSquare = square;
         } else if (moves != null && moves.contains(square)) {
 
             // Moving piece handling
-            board.movePiece(lastSquare, square);
+            board.makeMove(lastSquare, square);
             moves = null;
         } else if (square != lastSquare) {
             moves = null;
         }
-    }
-
-    String getFen()
-    {
-        return board.getFen();
     }
 
     static

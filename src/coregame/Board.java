@@ -5,100 +5,60 @@ import java.util.LinkedList;
 public class Board {
 
     private int[] board;
-    
     private boolean whiteTurn;
     private boolean[] castleRights;
     private Coordinate activeEnPassant;
-    private int halfMove, fullMove;
+    private int halfMove, fullMove, blackKingSquare, whiteKingSquare;
+    private LinkedList<String> fenHistory;
 
-    private static final LinkedList<Integer> NULL_LIST = new LinkedList<>();
-    private static final String DEFAULT_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", castlingNotation = "KQkq";
+    public static final String DEFAULT_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", castlingNotation = "KQkq";
 
     public Board(String fen) throws IllegalArgumentException
     {
-
-        if (fen == null) fen = DEFAULT_FEN;
-
-        String[] parsed = fen.split(" ");
-        String errorMessage = "Illegal Forsyth-Edwards Notation format";
-
-        if (parsed.length != 6) {
-            throw new IllegalArgumentException(errorMessage);
-        }
-
-        board = new int[64];
-
-        int rank = 0, file = 0;
-
-        for (char sym : parsed[0].toCharArray())
-        {
-            if (sym == '/') {
-                rank++;
-                file = 0;
-            } else {
-                if (Character.isLetter(sym)) {
-                    board[rank * 8 + file] = sym;
-                    file++;
-                } else if (Character.isDigit(sym)) {
-                    file += Character.getNumericValue(sym);
-                } else {
-                    throw new IllegalArgumentException(errorMessage);
-                }
-            }
-        }
-
-        castleRights = new boolean[4];
-
-        try {
-            whiteTurn = parsed[1].equals("w");
-
-            // Castle eval
-            String castleFen = parsed[2];
-            int castleLength = castleFen.length();
-
-            if (castleLength < 0 || castleLength > 4) throw new IllegalArgumentException(errorMessage);
-
-            else if (!(castleLength == 1 && castleFen.equals("-")))
-            {
-                for (int i = 0; i < castleLength; i++)
-                {
-                    char sym = castleFen.charAt(i);
-                    int index = castlingNotation.indexOf(sym);
-
-                    if (index != -1)
-                        castleRights[index] = true;
-                    else
-                        throw new IllegalArgumentException(errorMessage);
-                }
-            }
-
-            if (!parsed[3].equals("-")) {
-                activeEnPassant = Coordinate.valueOf(parsed[3]);
-            }
-
-            halfMove = Integer.parseInt(parsed[4]);
-            fullMove = Integer.parseInt(parsed[5]);
-        }
-        catch(Exception e) {
-            e.printStackTrace();
-        }
+        fenHistory = new LinkedList<>();
+        loadFen(fen);
     }
 
     public int get(int index) {
         return board[index];
     }
 
-    private boolean valid(int index) {
-        return index >= 0 && index < 64;
+    public int getBlackKingSquare() {
+        return blackKingSquare;
     }
 
-    public LinkedList<Integer> getMoves(int square)
+    public int getWhiteKingSquare() {
+        return whiteKingSquare;
+    }
+
+    private boolean check(boolean whiteToPlay)
     {
-        if (whiteTurn ^ Piece.isWhite(board[square])) return NULL_LIST;
+        int ourKingSquare = whiteToPlay ? blackKingSquare : whiteKingSquare;
 
-        int piece = Piece.removeColorFromData(board[square]);
+        for (int square = 0; square < 64; square++)
+        {
+            int piece = board[square];
 
-        return switch (piece)
+            if (piece == 0) continue;
+
+            if (!(Piece.isWhite(piece) ^ whiteToPlay))
+            {
+                LinkedList<Integer> moves = getPseudoLegalMoves(square);
+                for (int move : moves)
+                    if (move == ourKingSquare) return true;
+            }
+        }
+
+        return false;
+    }
+
+    public LinkedList<Integer> getPseudoLegalMoves(int square)
+    {
+        if ((whiteTurn ^ Piece.isWhite(board[square])) || board[square] == 0) return new LinkedList<>();
+
+        int rawPiece = Piece.removeColorFromData(board[square]);
+
+        return switch (rawPiece)
         {
             case Piece.PAWN   -> getPawnMoves(square);
             case Piece.KNIGHT -> getKnightMoves(square);
@@ -106,8 +66,28 @@ public class Board {
             case Piece.BISHOP -> getBishopMoves(square);
             case Piece.ROOK   -> getRookMoves(square);
             case Piece.QUEEN  -> getQueenMoves(square);
-            default           -> NULL_LIST;
+            default           -> new LinkedList<>();
         };
+    }
+
+    public LinkedList<Integer> getLegalMoves(int square)
+    {
+        LinkedList<Integer> pseudoLegalMoves = getPseudoLegalMoves(square);
+        LinkedList<Integer> legalMoves = new LinkedList<>();
+
+        boolean isWhite = Piece.isWhite(board[square]);
+
+        for (int move : pseudoLegalMoves)
+        {
+            makeMove(square, move);
+
+            if (!check(!isWhite))
+                legalMoves.push(move);
+
+            unMakeMove();
+        }
+
+        return legalMoves;
     }
 
     private LinkedList<Integer> getPawnMoves(int square) {
@@ -120,7 +100,7 @@ public class Board {
         int startRank = isWhite ? 6 : 1;
     
         int step = square + d;
-        if (valid(step) && board[step] == 0)
+        if ((step >= 0 && step < 64) && board[step] == 0)
         {
             pawnMoves.push(step);
     
@@ -138,7 +118,7 @@ public class Board {
     
             if ((offset == d - 1 && !onLeftEdge) || (offset == d + 1 && !onRightEdge))
             {
-                if (valid(target))
+                if (target >= 0 && target < 64)
                 {
                     int targetPiece = board[target];
                     if ((targetPiece != 0 && !Piece.sameTeam(piece, targetPiece)) || (activeEnPassant != null && activeEnPassant.ordinal() == target))
@@ -158,21 +138,21 @@ public class Board {
         int piece = board[square];
 
         nextSquare = square - 6;
-        if (valid(nextSquare) && nextSquare%8 != 0 && nextSquare%8 != 1 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 0 && nextSquare%8 != 1 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square + 6;
-        if (valid(nextSquare) && nextSquare%8 != 6 && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 6 && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square - 10;
-        if (valid(nextSquare) && nextSquare%8 != 6 && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 6 && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square + 10;
-        if (valid(nextSquare) && nextSquare%8 != 0 && nextSquare%8 != 1 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 0 && nextSquare%8 != 1 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square - 15;
-        if (valid(nextSquare) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square + 15;
-        if (valid(nextSquare) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square - 17;
-        if (valid(nextSquare) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
         nextSquare = square + 17;
-        if (valid(nextSquare) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) knightMoves.push(nextSquare);
 
         return knightMoves;
     }
@@ -184,28 +164,28 @@ public class Board {
         int piece = board[square];
 
         nextSquare = square + 1;
-        if (valid(nextSquare) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
         nextSquare = square - 1;
-        if (valid(nextSquare) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
         nextSquare = square + 7;
-        if (valid(nextSquare) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
         nextSquare = square - 7;
-        if (valid(nextSquare) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
         nextSquare = square + 9;
-        if (valid(nextSquare) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 0 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
         nextSquare = square - 9;
-        if (valid(nextSquare) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && nextSquare%8 != 7 && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
 
         nextSquare = square + 8;
-        if (valid(nextSquare) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
         nextSquare = square - 8;
-        if (valid(nextSquare) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
+        if ((nextSquare >= 0 && nextSquare < 64) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
 
         // Castle moves
 
         boolean isWhite = Piece.isWhite(piece);
 
-        if (isWhite ? castleRights[0] || castleRights[1] : castleRights[2] || castleRights[3] && square%8 == 4)
+        if ((isWhite ? castleRights[0] || castleRights[1] : castleRights[2] || castleRights[3] && square%8 == 4))
         {
             if (isWhite ? castleRights[0] : castleRights[2])
                 for (nextSquare = square + 1; nextSquare%8 != 7; nextSquare++)
@@ -317,6 +297,78 @@ public class Board {
         return queenMoves;
     }
 
+    public void loadFen(String fen) throws IllegalArgumentException
+    {
+        String[] parsed = fen.split(" ");
+        String errorMessage = "Illegal Forsyth-Edwards Notation format";
+
+        if (parsed.length != 6) {
+            throw new IllegalArgumentException(errorMessage);
+        }
+
+        board = new int[64];
+
+        int rank = 0, file = 0;
+
+        for (char sym : parsed[0].toCharArray())
+        {
+            if (sym == '/') {
+                rank++;
+                file = 0;
+            } else {
+                if (Character.isLetter(sym)) {
+                    int square = rank * 8 + file;
+                    board[square] = sym;
+                    if (sym == 'k') blackKingSquare = square;
+                    if (sym == 'K') whiteKingSquare = square;
+                    file++;
+                } else if (Character.isDigit(sym)) {
+                    file += Character.getNumericValue(sym);
+                } else {
+                    throw new IllegalArgumentException(errorMessage);
+                }
+            }
+        }
+
+        castleRights = new boolean[4];
+
+        try {
+            whiteTurn = parsed[1].equals("w");
+
+            // Castle eval
+            String castleFen = parsed[2];
+            int castleLength = castleFen.length();
+
+            if (castleLength < 0 || castleLength > 4) throw new IllegalArgumentException(errorMessage);
+
+            else if (!(castleLength == 1 && castleFen.equals("-")))
+            {
+                for (int i = 0; i < castleLength; i++)
+                {
+                    char sym = castleFen.charAt(i);
+                    int index = castlingNotation.indexOf(sym);
+
+                    if (index != -1)
+                        castleRights[index] = true;
+                    else
+                        throw new IllegalArgumentException(errorMessage);
+                }
+            }
+
+            if (parsed[3].equals("-")) {
+                activeEnPassant = null;
+            } else {
+                activeEnPassant = Coordinate.valueOf(parsed[3]);
+            }
+
+            halfMove = Integer.parseInt(parsed[4]);
+            fullMove = Integer.parseInt(parsed[5]);
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public String getFen()
     {
         String fen = "";
@@ -351,16 +403,23 @@ public class Board {
         return fen;
     }
 
-    public void movePiece(int squareB, int squareD)
+    public void makeMove(int squareB, int squareD)
     {
+        fenHistory.push(getFen());
         halfMove++;
-        if (board[squareD] != 0) halfMove = 0;
+        
+        if (board[squareD] != 0)
+            halfMove = 0;
 
         board[squareD] = board[squareB];
         board[squareB] = 0;
 
         int rawPiece = Piece.removeColorFromData(board[squareD]);
         boolean isWhite = Piece.isWhite(board[squareD]);
+
+        blackKingSquare = (rawPiece == Piece.KING && !isWhite) ? squareD : blackKingSquare;
+        whiteKingSquare = (rawPiece == Piece.KING &&  isWhite) ? squareD : whiteKingSquare;
+
         int d;
         
         /* KING MANAGEMENT : CASTLING */
@@ -380,8 +439,12 @@ public class Board {
                 if (file == 1 || file == 6)
                 {
                     d = file == 6 ? 7 : 0;
-                    board[rank * 8 + (file == 6 ? 5 : 2)] = board[rank * 8 + d];
-                    board[rank * 8 + d] = 0;
+
+                    int d1 = rank * 8 + (file == 6 ? 5 : 2);
+                    int d2 = rank * 8 + d;
+
+                    board[d1] = board[d2];
+                    board[d2] = 0;
                 }
                 
                 d = isWhite ? 0 : 1;
@@ -397,13 +460,15 @@ public class Board {
         d = isWhite ? -1 : 1;
         int enPassantTarget = squareD + 8 * -d;
 
-        if (activeEnPassant != null && activeEnPassant.ordinal() == squareD && isPawn)
+        if (isPawn && activeEnPassant != null && activeEnPassant.ordinal() == squareD)
+        {
             board[enPassantTarget] = 0;
+        }
 
         activeEnPassant = null;
 
         if (isPawn && squareD == squareB + 16 * d)
-            activeEnPassant = Coordinate.coordinateOf(enPassantTarget);
+            activeEnPassant = Coordinate.of(enPassantTarget);
 
         d = (d == -1 ? 0 : 7);
 
@@ -412,7 +477,41 @@ public class Board {
         /* NEXT TURN */
 
         if (!whiteTurn) fullMove++;
-        if (isPawn) halfMove = 0;
+        if (isPawn)
+        {
+            halfMove = 0;
+        }
         whiteTurn = !whiteTurn;
+    }
+
+    public void unMakeMove()
+    {
+        if (!fenHistory.isEmpty()) {
+            loadFen(fenHistory.pop());
+        }
+    }
+
+    public int perft(int depth)
+    {
+        if (depth == 0) {
+            return 1;
+        }
+    
+        int totalMoves = 0;
+    
+        for (int square = 0; square < 64; square++) {
+
+            if (board[square] == 0) continue;
+
+            LinkedList<Integer> legalMoves = getLegalMoves(square);
+    
+            for (int move : legalMoves) {
+                makeMove(square, move);
+                totalMoves += perft(depth - 1);
+                unMakeMove();
+            }
+        }
+
+        return totalMoves; // should test with 'rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8'
     }
 }

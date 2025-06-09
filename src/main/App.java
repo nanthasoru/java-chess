@@ -1,6 +1,10 @@
 package main;
 
+import java.util.LinkedList;
+
 import javax.swing.JFrame;
+
+import coregame.Board;
 
 public final class App implements Runnable
 {
@@ -13,6 +17,7 @@ public final class App implements Runnable
     private static App sub;
     private static Thread beta;
 
+    private static Board board;
     private App()
     {
         running = true;
@@ -27,13 +32,14 @@ public final class App implements Runnable
         }
 
         try {
-            gamePanel = new Panel(fen);
+            sub = new App();
+            gamePanel = new Panel(fen == null || fen.isEmpty() ? Board.DEFAULT_FEN : fen, sub);
+            board = gamePanel.getBoard(sub);
         } catch (IllegalArgumentException e) {
             gamePanel = null;
             throw new IllegalArgumentException();
         }
 
-        sub = new App();
         beta = new Thread(sub);
         
         gameFrame = new JFrame("chess");
@@ -53,24 +59,48 @@ public final class App implements Runnable
         beta.start();
     }
 
-    static void setHighlight(boolean choice)
+    static void setHighlight(boolean choice1, boolean choice2)
     {
         if (gamePanel != null)
-            gamePanel.setAttacksHighlight(choice);
+        {
+            gamePanel.setAttacksHighlight(choice1);
+            gamePanel.setKingHighlight(choice2);
+        }
     }
 
-    public static String getFen()
+    static String getFen()
     {
-        return gamePanel != null ? gamePanel.getFen() : null;
+        return board != null ? board.getFen() : null;
+    }
+
+    static void requestUndo()
+    {
+        if (board != null) board.unMakeMove();
+    }
+
+    static void performanceTest(int maxDepth)
+    {
+        if (board != null)
+        {
+            for (int depth = 1; depth <= maxDepth; depth++)
+            {
+                long beginning = System.currentTimeMillis();
+                int nodes = board.perft(depth);
+                long end = System.currentTimeMillis();
+
+                System.out.printf("depth %2d : %10d possibilities in %10dms\n", depth, nodes, end - beginning);
+            }
+        }
     }
 
     static void close()
     {
-        if (sub != null && beta != null && gameFrame != null && gamePanel != null && beta.isAlive())
+        if (sub != null && beta != null && gameFrame != null && gamePanel != null && board != null && beta.isAlive())
         {
             sub.running = false;
             gameFrame.remove(gamePanel);
             gameFrame.dispose();
+            board = null;
             gamePanel = null;
             sub = null;
             beta = null;

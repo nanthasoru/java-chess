@@ -11,9 +11,8 @@ public final class Main {
     {
         switch (command) {
             case "build":
-                String fen = ask("Forsyth-Edwards Notation (blank for default chessboard) : ");
                 try {
-                    App.build(fen.equals("") ? null : fen);
+                    App.build(ask("Forsyth-Edwards Notation (blank for default chessboard) : "));
                 } catch (IllegalArgumentException e) {
                     System.out.println("The provided fen is wrong.");
                 }
@@ -22,16 +21,30 @@ public final class Main {
                 App.close();
                 break;
             case "hide":
-                App.setHighlight(false);
+                App.setHighlight(false, false);
                 System.out.println("Will not highlight squares");
                 break;
             case "show":
-                App.setHighlight(true);
+                App.setHighlight(true, true);
                 System.out.println("Will highlight squares");
+                break;
+            case "aonly":
+                App.setHighlight(true, false);
                 break;
             case "fen":
                 command = App.getFen();
                 if (command != null) System.out.println(command);
+                break;
+            case "unmake":
+                App.requestUndo();
+                break;
+            case "perft":
+                App.performanceTest(Integer.parseInt(ask("Max depth : ")));
+                break;
+            case "quit":
+                App.close();
+                input.close();
+                System.out.println("Quitting...");
                 break;
             case "help":
                 System.out.println("""
@@ -46,6 +59,12 @@ public final class Main {
                         show  : adds back the red highlighting
 
                         fen   : prints in the current working terminal a FEN notation of the current board
+
+                        perft : runs a performance test
+
+                        unmake: undo the last move
+
+                        quit  : do as the commands says
                         """);
                 break;
             default:
@@ -69,9 +88,5 @@ public final class Main {
             command = ask("<chess>$ ");
             if (!command.isBlank()) eval(command);
         }
-
-        App.close();
-        input.close();
-        System.out.println("Quitting...");
     }
 }
