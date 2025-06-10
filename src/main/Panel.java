@@ -148,7 +148,7 @@ class Panel extends JPanel{
         } else if (moves != null && moves.contains(square)) {
 
             // Moving piece handling
-            board.makeMove(lastSquare, square);
+            board.makeMove(lastSquare, square, Piece.QUEEN - (Piece.isWhite(board.get(lastSquare)) ? Piece.WHITE : Piece.BLACK));
             moves = null;
         } else if (square != lastSquare) {
             moves = null;

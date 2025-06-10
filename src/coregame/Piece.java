@@ -12,6 +12,9 @@ public class Piece {
         BLACK = 0,
         WHITE = 32;
 
+    public static final int[] promotionPossibilities = { ROOK, KNIGHT, BISHOP, QUEEN };
+    
+
     public static int removeColorFromData(int piece)
     {
         return piece + (Character.isUpperCase(piece) ? WHITE : BLACK);

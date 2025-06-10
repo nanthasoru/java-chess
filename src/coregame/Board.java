@@ -9,14 +9,77 @@ public class Board {
     private boolean[] castleRights;
     private Coordinate activeEnPassant;
     private int halfMove, fullMove, blackKingSquare, whiteKingSquare;
-    private LinkedList<String> fenHistory;
+    private LinkedList<String> fenHistory, perftInfo;
 
-    public static final String DEFAULT_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", castlingNotation = "KQkq";
+    public static final String castlingNotation = "KQkq";
+
+    public static final String[] positions =
+    {
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", // works
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", // doesn't work at depth 4, can't figure out what's the problem
+        "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", // works
+        "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", // works
+        "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", // works
+        "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10" // works
+    };
+
+    public static final int[][] nodes = // Official nodes number from chesswiki
+    {
+        { // positions[0]
+            1, // depth = 0
+            20, // depth = 1
+            400, // depth = 2 etc...
+            8_902,
+            197_281,
+            4_865_609 // depth 5
+        },
+        {
+            1,
+            48,
+            2_039,
+            97_862,
+            4_085_603,
+            193_690_690
+        },
+        {
+            1,
+            14,
+            191,
+            2_812,
+            43_238,
+            674_624
+        },
+        {
+            1,
+            6,
+            264,
+            9_467,
+            422_333,
+            15_833_292
+        },
+        {
+            1,
+            44,
+            1_486,
+            62_379,
+            2_103_487,
+            89_941_194
+        },
+        {
+            1,
+            46,
+            2_079,
+            89_890,
+            3_894_594,
+            164_075_551
+        }
+    };
 
     public Board(String fen) throws IllegalArgumentException
     {
         fenHistory = new LinkedList<>();
         loadFen(fen);
+        perftInfo = new LinkedList<>();
     }
 
     public int get(int index) {
@@ -31,31 +94,46 @@ public class Board {
         return whiteKingSquare;
     }
 
+    public LinkedList<String> getPerftInfo() {
+        return perftInfo;
+    }
+
     private boolean check(boolean whiteToPlay)
     {
-        int ourKingSquare = whiteToPlay ? blackKingSquare : whiteKingSquare;
+        return isSquareAttacked(whiteToPlay ? blackKingSquare : whiteKingSquare, whiteTurn);
+    }
 
+    /*
+        Well, see if a square is under attack
+    */
+    private boolean isSquareAttacked(int targetSquare, boolean byWhite)
+    {
         for (int square = 0; square < 64; square++)
         {
             int piece = board[square];
 
             if (piece == 0) continue;
 
-            if (!(Piece.isWhite(piece) ^ whiteToPlay))
+            if (Piece.isWhite(piece) == byWhite)
             {
-                LinkedList<Integer> moves = getPseudoLegalMoves(square);
-                for (int move : moves)
-                    if (move == ourKingSquare) return true;
+                LinkedList<Integer> moves = getPseudoLegalMoves(square, false);
+                for (int move : moves) // if a move of the piece target's our square, the square is under attack !
+                    if (move == targetSquare)
+                        return true;
             }
         }
 
         return false;
     }
 
-    public LinkedList<Integer> getPseudoLegalMoves(int square)
+    /*
+        automatically gets the right function to get a piece move
+    */
+    public LinkedList<Integer> getPseudoLegalMoves(int square, boolean strict)
     {
-        if ((whiteTurn ^ Piece.isWhite(board[square])) || board[square] == 0) return new LinkedList<>();
 
+        // if strict, we get the moves ONLY if it's our turn to play
+        if ((strict && (whiteTurn ^ Piece.isWhite(board[square]))) || board[square] == 0) return new LinkedList<>();
         int rawPiece = Piece.removeColorFromData(board[square]);
 
         return switch (rawPiece)
@@ -72,24 +150,34 @@ public class Board {
 
     public LinkedList<Integer> getLegalMoves(int square)
     {
-        LinkedList<Integer> pseudoLegalMoves = getPseudoLegalMoves(square);
-        LinkedList<Integer> legalMoves = new LinkedList<>();
+        LinkedList<Integer> pseudoLegalMoves = getPseudoLegalMoves(square, true); // first, get pseudo legal moves
 
-        boolean isWhite = Piece.isWhite(board[square]);
+        // if it's king's move : well let's add castle move
+        if (Piece.removeColorFromData(board[square]) == Piece.KING && (whiteTurn == Piece.isWhite(board[square])))
+            addCastleMove(square, pseudoLegalMoves);
+        
+        LinkedList<Integer> legalMoves = new LinkedList<>();
 
         for (int move : pseudoLegalMoves)
         {
-            makeMove(square, move);
+            // for each pseudo legal move we play them on the board
+            makeMove(square, move, board[square]);
 
-            if (!check(!isWhite))
+            // if after playing it's not check, it's legal, i think ?
+            // if we are in check, and that we play a move, and we're still in check, it's an illegal move
+            if (!check(whiteTurn))
                 legalMoves.push(move);
 
+            // undo the move now that we know whether the move is legal or not
             unMakeMove();
         }
 
         return legalMoves;
     }
 
+    /*
+        Gets pawn's move
+    */
     private LinkedList<Integer> getPawnMoves(int square) {
         LinkedList<Integer> pawnMoves = new LinkedList<>();
 
@@ -102,27 +190,27 @@ public class Board {
         int step = square + d;
         if ((step >= 0 && step < 64) && board[step] == 0)
         {
-            pawnMoves.push(step);
+            pawnMoves.push(step); // simple push
     
             step += d;
-            if ((square / 8) == startRank && board[step] == 0)
+            if ((square / 8) == startRank && board[step] == 0) // double push
                 pawnMoves.push(step);
         }
         
-        for (int offset : new int[]{d - 1, d + 1})
+        for (int offset : new int[]{d - 1, d + 1}) // diagonals attack
         {
-            int target = square + offset;
+            int nextSquare = square + offset;
     
             boolean onLeftEdge = (square % 8 == 0);
             boolean onRightEdge = (square % 8 == 7);
     
             if ((offset == d - 1 && !onLeftEdge) || (offset == d + 1 && !onRightEdge))
             {
-                if (target >= 0 && target < 64)
+                if (nextSquare >= 0 && nextSquare < 64)
                 {
-                    int targetPiece = board[target];
-                    if ((targetPiece != 0 && !Piece.sameTeam(piece, targetPiece)) || (activeEnPassant != null && activeEnPassant.ordinal() == target))
-                        pawnMoves.push(target);
+                    int targetPiece = board[nextSquare];
+                    if ((targetPiece != 0 && !Piece.sameTeam(piece, targetPiece)) || (activeEnPassant != null && activeEnPassant.ordinal() == nextSquare))
+                        pawnMoves.push(nextSquare);
                 }
             }
         }
@@ -130,6 +218,9 @@ public class Board {
         return pawnMoves;
     }
 
+    /*
+        Gets knight's move
+    */
     private LinkedList<Integer> getKnightMoves(int square)
     {
         LinkedList<Integer> knightMoves = new LinkedList<>();
@@ -157,6 +248,9 @@ public class Board {
         return knightMoves;
     }
 
+    /*
+        gets king's regular move (without castle)
+    */
     private LinkedList<Integer> getKingMoves(int square)
     {
         LinkedList<Integer> kingMoves = new LinkedList<>();
@@ -181,30 +275,29 @@ public class Board {
         nextSquare = square - 8;
         if ((nextSquare >= 0 && nextSquare < 64) && Piece.notAlly(board[nextSquare], piece)) kingMoves.push(nextSquare);
 
-        // Castle moves
-
-        boolean isWhite = Piece.isWhite(piece);
-
-        if ((isWhite ? castleRights[0] || castleRights[1] : castleRights[2] || castleRights[3] && square%8 == 4))
-        {
-            if (isWhite ? castleRights[0] : castleRights[2])
-                for (nextSquare = square + 1; nextSquare%8 != 7; nextSquare++)
-                {
-                    if (board[nextSquare] != 0) break;
-                    if (nextSquare%8 == 6 && Piece.removeColorFromData(board[nextSquare+1]) == Piece.ROOK && Piece.sameTeam(board[nextSquare+1], board[square])) kingMoves.push(nextSquare);
-                }
-
-            if (isWhite ? castleRights[1] : castleRights[3])
-                for (nextSquare = square - 1; nextSquare%8 != 0; nextSquare--)
-                {
-                    if (board[nextSquare] != 0) break;
-                    if (nextSquare%8 == 1 && Piece.removeColorFromData(board[nextSquare-1]) == Piece.ROOK && Piece.sameTeam(board[nextSquare-1], board[square])) kingMoves.push(nextSquare);
-                }
-        }
-
         return kingMoves;
     }
 
+    /*
+        Adds the possibility to castle (if possible) to pre-existing king moves
+    */
+    private void addCastleMove(int square, LinkedList<Integer> kingMoves)
+    {
+        int piece = board[square];
+        boolean isWhite = Piece.isWhite(piece);
+
+        if (isSquareAttacked(square, !isWhite)) return; // check ? can't castle
+
+        if (((isWhite ? castleRights[0] || castleRights[1] : castleRights[2] || castleRights[3]) && square%8 == 4)) // already, castled ? rook moved ? a square between the rook and the king is attacked ? or is not empty ? can't castle
+        {
+            if (board[square+1] == 0 && board[square+2] == 0 && !isSquareAttacked(square+1, !isWhite) && !isSquareAttacked(square+2, !isWhite) && Piece.removeColorFromData(board[square+3]) == Piece.ROOK && Piece.sameTeam(board[square], board[square+3])) kingMoves.push(square+2);
+            if (board[square-1] == 0 && board[square-2] == 0 && board[square-3] == 0 && !isSquareAttacked(square-1, !isWhite) && !isSquareAttacked(square-2, !isWhite) && Piece.removeColorFromData(board[square-4]) == Piece.ROOK && Piece.sameTeam(board[square], board[square-4])) kingMoves.push(square-2);
+        } 
+    }
+
+    /*
+        get bishop's pseudo legal moves
+    */
     private LinkedList<Integer> getBishopMoves(int targetSquare)
     {
         LinkedList<Integer> bishopMoves = new LinkedList<>();
@@ -214,38 +307,43 @@ public class Board {
 
         int rank, file, square;
 
-        for (rank = targetRank + 1, file = targetFile + 1; rank < 8  && file <  8; rank++, file++)
+        for (rank = targetRank + 1, file = targetFile + 1; rank < 8  && file <  8; rank++, file++) // down right
         {
             square = rank*8+file;
             if (!Piece.notAlly(board[square], board[targetSquare])) break;
             bishopMoves.push(square);
             if (board[square] != 0) break;
         }
-        for (rank = targetRank - 1, file = targetFile + 1; rank >= 0 && file <  8; rank--, file++)
+        for (rank = targetRank - 1, file = targetFile + 1; rank >= 0 && file <  8; rank--, file++) // up right
         {
             square = rank*8+file;
             if (!Piece.notAlly(board[square], board[targetSquare])) break;
             bishopMoves.push(square);
             if (board[square] != 0) break;
         }
-        for (rank = targetRank + 1, file = targetFile - 1; rank < 8  && file >= 0; rank++, file--)
+        for (rank = targetRank + 1, file = targetFile - 1; rank < 8  && file >= 0; rank++, file--) // down left
         {
             square = rank*8+file;
             if (!Piece.notAlly(board[square], board[targetSquare])) break;
             bishopMoves.push(square);
             if (board[square] != 0) break;
         }
-        for (rank = targetRank - 1, file = targetFile - 1; rank >= 0 && file >= 0; rank--, file--)
+        for (rank = targetRank - 1, file = targetFile - 1; rank >= 0 && file >= 0; rank--, file--) // up left
         {
             square = rank*8+file;
             if (!Piece.notAlly(board[square], board[targetSquare])) break;
             bishopMoves.push(square);
             if (board[square] != 0) break;
         }
+
+        // works like the getRookMoves() function
 
         return bishopMoves;
     }
 
+    /*
+        Gets rook's pseudo legal moves
+    */
     private LinkedList<Integer> getRookMoves(int targetSquare)
     {
         LinkedList<Integer> rookMoves = new LinkedList<>();
@@ -255,38 +353,43 @@ public class Board {
 
         int rank, file, square;
 
-        for (rank = targetRank + 1; rank <  8; rank++)
+        for (rank = targetRank + 1; rank <  8; rank++) // downwards
         {
             square = rank * 8 + targetFile;
             if (!Piece.notAlly(board[square], board[targetSquare])) break;
             rookMoves.push(square);
             if (board[square] != 0) break;
         }
-        for (rank = targetRank - 1; rank >= 0; rank--)
+        for (rank = targetRank - 1; rank >= 0; rank--) // upwards
         {
             square = rank * 8 + targetFile;
             if (!Piece.notAlly(board[square], board[targetSquare])) break;
             rookMoves.push(square);
             if (board[square] != 0) break;
         }
-        for (file = targetFile + 1; file <  8; file++)
+        for (file = targetFile + 1; file <  8; file++) // right
         {
             square = targetRank * 8 + file;
             if (!Piece.notAlly(board[square], board[targetSquare])) break;
             rookMoves.push(square);
             if (board[square] != 0) break;
         }
-        for (file = targetFile - 1; file >= 0; file--)
+        for (file = targetFile - 1; file >= 0; file--) // left
         {
             square = targetRank * 8 + file;
             if (!Piece.notAlly(board[square], board[targetSquare])) break;
             rookMoves.push(square);
             if (board[square] != 0) break;
         }
+
+        // if we encountered a friendly piece we break before adding the move, if it's an enemy piece we add the move the break;
 
         return rookMoves;
     }
 
+    /*
+        Gets queen's pseudo legal moves
+    */
     private LinkedList<Integer> getQueenMoves(int square)
     {
         LinkedList<Integer> queenMoves = new LinkedList<>();
@@ -297,6 +400,9 @@ public class Board {
         return queenMoves;
     }
 
+    /*
+        Init the board with a fen
+    */
     public void loadFen(String fen) throws IllegalArgumentException
     {
         String[] parsed = fen.split(" ");
@@ -312,17 +418,20 @@ public class Board {
 
         for (char sym : parsed[0].toCharArray())
         {
-            if (sym == '/') {
+            if (sym == '/') { // we're going to next rank
                 rank++;
                 file = 0;
             } else {
-                if (Character.isLetter(sym)) {
+                if (Character.isLetter(sym)) { // OH ! Let's init a piece on the board
                     int square = rank * 8 + file;
                     board[square] = sym;
+
+                    //to keep track of our king
                     if (sym == 'k') blackKingSquare = square;
-                    if (sym == 'K') whiteKingSquare = square;
+                    if (sym == 'K') whiteKingSquare = square; 
+
                     file++;
-                } else if (Character.isDigit(sym)) {
+                } else if (Character.isDigit(sym)) { // some empty squares, let's just skip them
                     file += Character.getNumericValue(sym);
                 } else {
                     throw new IllegalArgumentException(errorMessage);
@@ -333,7 +442,7 @@ public class Board {
         castleRights = new boolean[4];
 
         try {
-            whiteTurn = parsed[1].equals("w");
+            whiteTurn = parsed[1].equals("w"); // who's turn ?
 
             // Castle eval
             String castleFen = parsed[2];
@@ -341,7 +450,7 @@ public class Board {
 
             if (castleLength < 0 || castleLength > 4) throw new IllegalArgumentException(errorMessage);
 
-            else if (!(castleLength == 1 && castleFen.equals("-")))
+            else if (!(castleLength == 1 && castleFen.equals("-"))) // if the castleFen is "-" everything is already set to false by default
             {
                 for (int i = 0; i < castleLength; i++)
                 {
@@ -369,12 +478,15 @@ public class Board {
         }
     }
 
+    /*
+        Generates our board's Forsyth-Edwards Notation
+    */
     public String getFen()
     {
         String fen = "";
         int blank = 0;
 
-        for (int square = 0; square < 64; square++)
+        for (int square = 0; square < 64; square++) // First part of the string
         {
             int piece = board[square];
             
@@ -393,64 +505,76 @@ public class Board {
             if (piece == 0) blank++;
         }
 
-        fen += " " + (whiteTurn ? "w" : "b") + " ";
+        fen += " " + (whiteTurn ? "w" : "b") + " "; // who's turn
 
+        String castleFen = "";
         for (int i = 0; i < 4; i++)
-            fen += castleRights[i] ? castlingNotation.charAt(i) : "";
+            castleFen += castleRights[i] ? castlingNotation.charAt(i) : ""; // generating castle rights string
+
+        fen += castleFen.isEmpty() ? "-" : castleFen;
         
-        fen += " " + (activeEnPassant == null ? "-" : activeEnPassant.name()) + " " + halfMove + " " + fullMove;
+        fen += " " + (activeEnPassant == null ? "-" : activeEnPassant.name()) + " " + halfMove + " " + fullMove; // en passant target square and details on halfMove and fullMove
 
         return fen;
     }
 
-    public void makeMove(int squareB, int squareD)
+    /*
+        Move piece from the square(begin) to square(destination), also manages castles, en passant and pawn promotion
+    */
+    public void makeMove(int squareB, int squareD, int whatPieceWhenPromoted)
     {
-        fenHistory.push(getFen());
+        fenHistory.push(getFen()); // before making changes on our board, let's just save it to unmake the move later on if we wish to
         halfMove++;
-        
+
         if (board[squareD] != 0)
             halfMove = 0;
 
+        // moving our piece
         board[squareD] = board[squareB];
         board[squareB] = 0;
 
         int rawPiece = Piece.removeColorFromData(board[squareD]);
         boolean isWhite = Piece.isWhite(board[squareD]);
 
+        //let's just keep track of our kings location
         blackKingSquare = (rawPiece == Piece.KING && !isWhite) ? squareD : blackKingSquare;
         whiteKingSquare = (rawPiece == Piece.KING &&  isWhite) ? squareD : whiteKingSquare;
 
         int d;
         
         /* KING MANAGEMENT : CASTLING */
-        if (isWhite ? (castleRights[0] || castleRights[1]) : (castleRights[2] || castleRights[3]))
+        if (isWhite ? (castleRights[0] || castleRights[1]) : (castleRights[2] || castleRights[3])) // do they still have the right to check
         {
             int rank = squareD/8;
             int file = squareD%8;
 
             if (rawPiece == Piece.ROOK)
             {
-                castleRights[isWhite ? (file == 6 ? 0 : 1) : (file == 1 ? 2 : 3)] = false;
+                // if a rook is moving then he loses his ability to castle with his king
+                castleRights[isWhite ? (file == 7 ? 0 : 1) : (file == 7 ? 2 : 3)] = false;
             }
 
             if (rawPiece == Piece.KING)
             {
-
-                if (file == 1 || file == 6)
+                if (file == 2 || file == 6) // the king castled ! the rook should come here now
                 {
                     d = file == 6 ? 7 : 0;
 
-                    int d1 = rank * 8 + (file == 6 ? 5 : 2);
+                    int d1 = rank * 8 + (file == 6 ? 5 : 3);
                     int d2 = rank * 8 + d;
 
                     board[d1] = board[d2];
                     board[d2] = 0;
                 }
                 
-                d = isWhite ? 0 : 1;
-
-                castleRights[0 + d] = false;
-                castleRights[1 + d] = false;
+                // king won't castle anymore
+                if (isWhite) {
+                    castleRights[0] = false;
+                    castleRights[1] = false;
+                } else {
+                    castleRights[2] = false;
+                    castleRights[3] = false;
+                }
             }
         }
         
@@ -458,21 +582,21 @@ public class Board {
         
         boolean isPawn = rawPiece == Piece.PAWN;
         d = isWhite ? -1 : 1;
-        int enPassantTarget = squareD + 8 * -d;
+        int enPassantTarget = squareD + 8 * -d; // the dude who's going to be eaten
 
         if (isPawn && activeEnPassant != null && activeEnPassant.ordinal() == squareD)
         {
             board[enPassantTarget] = 0;
         }
 
-        activeEnPassant = null;
+        activeEnPassant = null; // if we move a piece, the last enPassant square is reset
 
         if (isPawn && squareD == squareB + 16 * d)
-            activeEnPassant = Coordinate.of(enPassantTarget);
-
+            activeEnPassant = Coordinate.of(enPassantTarget); // if a pawn double pushes his opponents pawn can en Passant him
+            
         d = (d == -1 ? 0 : 7);
 
-        if (isPawn && squareD/8 == d) board[squareD] = Piece.QUEEN - (d == 0 ? Piece.WHITE : Piece.BLACK);
+        if (isPawn && squareD/8 == d) board[squareD] = whatPieceWhenPromoted; // the pawn did it ! he can be promoted
 
         /* NEXT TURN */
 
@@ -484,16 +608,21 @@ public class Board {
         whiteTurn = !whiteTurn;
     }
 
+    /*
+        Takes previous board fen and loads it
+    */
     public void unMakeMove()
     {
-        if (!fenHistory.isEmpty()) {
+        if (!fenHistory.isEmpty())
             loadFen(fenHistory.pop());
-        }
     }
 
-    public int perft(int depth)
+    /*
+        Returns the number of makeable moves at a given board, for a given depth
+    */
+    public int perft(int depth, int initialDepth)
     {
-        if (depth == 0) {
+        if (depth == 0) { // Won't go too further
             return 1;
         }
     
@@ -501,17 +630,37 @@ public class Board {
     
         for (int square = 0; square < 64; square++) {
 
-            if (board[square] == 0) continue;
+            if (board[square] == 0) continue; // for each pieces on the board
 
-            LinkedList<Integer> legalMoves = getLegalMoves(square);
+            LinkedList<Integer> legalMoves = getLegalMoves(square); // we get the legal moves
     
-            for (int move : legalMoves) {
-                makeMove(square, move);
-                totalMoves += perft(depth - 1);
-                unMakeMove();
+            for (int move : legalMoves) { // And for each of them
+
+                boolean isWhite = Piece.isWhite(board[square]);
+                if ((Piece.removeColorFromData(board[square]) == Piece.PAWN) && move / 8 == (isWhite ? 0 : 7)) {
+                for (int possiblePromotion : Piece.promotionPossibilities) { // if it's a pawn promoting, we do every promotion
+                        makeMove(square, move, possiblePromotion - (isWhite ? Piece.WHITE : Piece.BLACK)); // we promote the pawn and play the move
+                        int nodes = perft(depth-1, initialDepth); // count the possibilities
+
+                        if (depth == initialDepth)
+                            perftInfo.push("" + Coordinate.of(square) + Coordinate.of(move) + (char)possiblePromotion + ": " + nodes);
+
+                        totalMoves += nodes;
+                        unMakeMove(); // backtrack
+                    }
+                } else {
+                    makeMove(square, move, board[square]); // make the move
+                    int nodes = perft(depth-1, initialDepth);
+
+                    if (depth == initialDepth)
+                        perftInfo.push("" + Coordinate.of(square) + Coordinate.of(move) + ": " + nodes);
+
+                    totalMoves += nodes; // count the possibilities
+                    unMakeMove(); // backtrack
+                }
             }
         }
 
-        return totalMoves; // should test with 'rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8'
+        return totalMoves;
     }
 }

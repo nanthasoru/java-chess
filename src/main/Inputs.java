@@ -3,8 +3,6 @@ package main;
 import java.awt.event.MouseEvent;
 import javax.swing.event.MouseInputListener;
 
-import coregame.Board;
-
 public class Inputs implements MouseInputListener 
 {
 

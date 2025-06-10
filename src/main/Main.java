@@ -1,11 +1,10 @@
 package main;
 
-import coregame.*;
 import java.util.Scanner;
 
 public final class Main {
 
-    private static final Scanner input = new Scanner(System.in);
+    public static final Scanner input = new Scanner(System.in);
 
     private static void eval(String command)
     {
@@ -28,7 +27,7 @@ public final class Main {
                 App.setHighlight(true, true);
                 System.out.println("Will highlight squares");
                 break;
-            case "aonly":
+            case "reset":
                 App.setHighlight(true, false);
                 break;
             case "fen":
@@ -39,12 +38,16 @@ public final class Main {
                 App.requestUndo();
                 break;
             case "perft":
-                App.performanceTest(Integer.parseInt(ask("Max depth : ")));
+                String position = ask("Position in range [0, 5] (blank for current board fen): ");
+                App.performanceTest(Integer.parseInt(ask("Min depth : ")), Integer.parseInt(ask("Max depth : ")), position.isBlank() ? -1 : Integer.parseInt(position));
                 break;
             case "quit":
                 App.close();
                 input.close();
                 System.out.println("Quitting...");
+                break;
+            case "toggle":
+                App.stayOnTop();
                 break;
             case "help":
                 System.out.println("""
@@ -54,9 +57,11 @@ public final class Main {
 
                         stop  : closes the current board if active
 
-                        hide  : removes the red highlighting
+                        hide  : removes all highlighting
 
-                        show  : adds back the red highlighting
+                        show  : highlights everything
+
+                        reset : sets highlighting back to default
 
                         fen   : prints in the current working terminal a FEN notation of the current board
 
@@ -65,6 +70,21 @@ public final class Main {
                         unmake: undo the last move
 
                         quit  : do as the commands says
+
+                        toggle: Window stays/won't stay on top
+
+                        perft : runs a performance test, if the specified position index is out of range, it runs the performance test on the current board
+
+                                positions (from 0 to 5) (can't gp past depth 5 on these)
+
+                                rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+                                r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+                                8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+                                r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1
+                                rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8
+                                r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10"
+
+                        help  : this command
                         """);
                 break;
             default:

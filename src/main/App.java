@@ -1,6 +1,6 @@
 package main;
 
-import java.util.LinkedList;
+import java.util.Collections;
 
 import javax.swing.JFrame;
 
@@ -18,6 +18,7 @@ public final class App implements Runnable
     private static Thread beta;
 
     private static Board board;
+
     private App()
     {
         running = true;
@@ -33,7 +34,7 @@ public final class App implements Runnable
 
         try {
             sub = new App();
-            gamePanel = new Panel(fen == null || fen.isEmpty() ? Board.DEFAULT_FEN : fen, sub);
+            gamePanel = new Panel(fen == null || fen.isEmpty() ? Board.positions[0] : fen, sub);
             board = gamePanel.getBoard(sub);
         } catch (IllegalArgumentException e) {
             gamePanel = null;
@@ -53,18 +54,18 @@ public final class App implements Runnable
         
         gameFrame.setLocationRelativeTo(null);
         gameFrame.setResizable(false);
-        gameFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        gameFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         gameFrame.setVisible(true);
 
         beta.start();
     }
 
-    static void setHighlight(boolean choice1, boolean choice2)
+    static void setHighlight(boolean attack, boolean king)
     {
         if (gamePanel != null)
         {
-            gamePanel.setAttacksHighlight(choice1);
-            gamePanel.setKingHighlight(choice2);
+            gamePanel.setAttacksHighlight(attack);
+            gamePanel.setKingHighlight(king);
         }
     }
 
@@ -78,19 +79,57 @@ public final class App implements Runnable
         if (board != null) board.unMakeMove();
     }
 
-    static void performanceTest(int maxDepth)
+    static void performanceTest(int minDepth, int maxDepth, int p)
     {
-        if (board != null)
+        boolean validPosition = (p >= 0 && p < 6);
+        
+        if (validPosition)
         {
-            for (int depth = 1; depth <= maxDepth; depth++)
-            {
-                long beginning = System.currentTimeMillis();
-                int nodes = board.perft(depth);
-                long end = System.currentTimeMillis();
-
-                System.out.printf("depth %2d : %10d possibilities in %10dms\n", depth, nodes, end - beginning);
-            }
+            if (beta != null && beta.isAlive())
+                board.loadFen(Board.positions[p]);
+            else
+                App.build(Board.positions[p]);
         }
+
+        if (beta == null || !beta.isAlive())
+        {
+            System.out.println("Specified position isn't between 0 and 5, and no board is currently active, can't run performance test.");
+            return;
+        }
+
+        board.getPerftInfo().clear();
+
+        if (validPosition)
+            System.out.printf("Performance test, position %d, %s\n", p, Board.positions[p]);
+
+        for (int depth = minDepth; depth <= maxDepth; depth++)
+        {
+            long beginning = System.currentTimeMillis();
+            int nodes = board.perft(depth, depth);
+            long end = System.currentTimeMillis();
+
+            String info = String.format("depth %2d : %10d possibilities in %10dms", depth, nodes, end - beginning);
+
+            if (validPosition && depth < Board.nodes[p].length)
+            {
+                int expectedNodes = Board.nodes[p][depth];
+                boolean success = expectedNodes == nodes;
+                System.out.printf("%s %c %s\n", info, success ? '✅' : '❌', success ? "" : String.format("expected %d nodes", expectedNodes));
+            }
+            else
+                System.out.println(info);
+        }
+
+        Collections.sort(board.getPerftInfo());
+
+        for (String info : board.getPerftInfo())
+            System.out.println(info);
+    }
+
+    static void stayOnTop()
+    {
+        if (gameFrame != null)
+            gameFrame.setAlwaysOnTop(!gameFrame.isAlwaysOnTop());
     }
 
     static void close()
