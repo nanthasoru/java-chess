@@ -5,7 +5,7 @@ Chess game in Java
 
 It's my very first 'big project', i neved touched JPanel and JFrame before, or made any GUI programs.
 
-I decided to a simple app to train and i chose chess. (i deeply regret it was way harder than i thought)
+I decided to make a simple app to train and i chose chess. (i deeply regret it was way harder than i thought)
 The code for the GUI is really messy, and the code for generating moves is even more chaotic.
 
 So expect some bugs when playing
@@ -45,7 +45,7 @@ build
 
 To test if i successfully implemented the game i watched some videos on chess programming (like Sebastian Lague's coding adventure), and did performance tests.
 As far as i know on position[1] : r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1
-I get 4085662 nodes instead of 4085603
+I get 4085662 nodes instead of 4085603 on depth 4
 
 The problem comes from the pawn on d5
 
