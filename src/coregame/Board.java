@@ -1,6 +1,6 @@
 package coregame;
 
-import java.util.LinkedList;
+import java.util.ArrayDeque;
 
 public class Board {
 
@@ -9,11 +9,11 @@ public class Board {
     private boolean[] castleRights;
     private Coordinate activeEnPassant;
     private int halfMove, fullMove, blackKingSquare, whiteKingSquare;
-    private LinkedList<String> fenHistory, perftInfo;
+    private ArrayDeque<String> fenHistory, perftInfo;
 
     public static final String castlingNotation = "KQkq";
 
-    public static final String[] positions =
+    public static final String[] positions = // used in App.performanceTest()
     {
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", // works
         "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", // doesn't work at depth 4, can't figure out what's the problem
@@ -77,9 +77,9 @@ public class Board {
 
     public Board(String fen) throws IllegalArgumentException
     {
-        fenHistory = new LinkedList<>();
+        fenHistory = new ArrayDeque<>();
         loadFen(fen);
-        perftInfo = new LinkedList<>();
+        perftInfo = new ArrayDeque<>();
     }
 
     public int get(int index) {
@@ -94,7 +94,7 @@ public class Board {
         return whiteKingSquare;
     }
 
-    public LinkedList<String> getPerftInfo() {
+    public ArrayDeque<String> getPerftInfo() {
         return perftInfo;
     }
 
@@ -116,7 +116,7 @@ public class Board {
 
             if (Piece.isWhite(piece) == byWhite)
             {
-                LinkedList<Integer> moves = getPseudoLegalMoves(square, false);
+                ArrayDeque<Integer> moves = getPseudoLegalMoves(square, false, true);
                 for (int move : moves) // if a move of the piece target's our square, the square is under attack !
                     if (move == targetSquare)
                         return true;
@@ -126,37 +126,51 @@ public class Board {
         return false;
     }
 
+    public boolean checkMate()
+    {
+        for (int square = 0; square < 64; square++)
+        {
+            if (board[square] == 0) continue;
+
+            if (!getLegalMoves(square).isEmpty()) return false;
+        }
+
+        return true;
+    }
+
     /*
         automatically gets the right function to get a piece move
     */
-    public LinkedList<Integer> getPseudoLegalMoves(int square, boolean strict)
+    public ArrayDeque<Integer> getPseudoLegalMoves(int square, boolean strict, boolean pawnAlwaysWithDiagonals)
     {
 
         // if strict, we get the moves ONLY if it's our turn to play
-        if ((strict && (whiteTurn ^ Piece.isWhite(board[square]))) || board[square] == 0) return new LinkedList<>();
+        if ((strict && (whiteTurn ^ Piece.isWhite(board[square]))) || board[square] == 0) return new ArrayDeque<>();
         int rawPiece = Piece.removeColorFromData(board[square]);
 
         return switch (rawPiece)
         {
-            case Piece.PAWN   -> getPawnMoves(square);
+            case Piece.PAWN   -> getPawnMoves(square, pawnAlwaysWithDiagonals);
             case Piece.KNIGHT -> getKnightMoves(square);
             case Piece.KING   -> getKingMoves(square);
             case Piece.BISHOP -> getBishopMoves(square);
             case Piece.ROOK   -> getRookMoves(square);
             case Piece.QUEEN  -> getQueenMoves(square);
-            default           -> new LinkedList<>();
+            default           -> new ArrayDeque<>();
         };
     }
 
-    public LinkedList<Integer> getLegalMoves(int square)
+    public ArrayDeque<Integer> getLegalMoves(int square)
     {
-        LinkedList<Integer> pseudoLegalMoves = getPseudoLegalMoves(square, true); // first, get pseudo legal moves
+        ArrayDeque<Integer> pseudoLegalMoves = getPseudoLegalMoves(square, true, false); // first, get pseudo legal moves
 
         // if it's king's move : well let's add castle move
         if (Piece.removeColorFromData(board[square]) == Piece.KING && (whiteTurn == Piece.isWhite(board[square])))
             addCastleMove(square, pseudoLegalMoves);
+
+        if (pseudoLegalMoves.isEmpty()) return pseudoLegalMoves;
         
-        LinkedList<Integer> legalMoves = new LinkedList<>();
+        ArrayDeque<Integer> legalMoves = new ArrayDeque<>();
 
         for (int move : pseudoLegalMoves)
         {
@@ -178,8 +192,8 @@ public class Board {
     /*
         Gets pawn's move
     */
-    private LinkedList<Integer> getPawnMoves(int square) {
-        LinkedList<Integer> pawnMoves = new LinkedList<>();
+    private ArrayDeque<Integer> getPawnMoves(int square, boolean alwaysWithDiagonals) {
+        ArrayDeque<Integer> pawnMoves = new ArrayDeque<>();
 
         int piece = board[square];
         boolean isWhite = Piece.isWhite(piece);
@@ -209,7 +223,7 @@ public class Board {
                 if (nextSquare >= 0 && nextSquare < 64)
                 {
                     int targetPiece = board[nextSquare];
-                    if ((targetPiece != 0 && !Piece.sameTeam(piece, targetPiece)) || (activeEnPassant != null && activeEnPassant.ordinal() == nextSquare))
+                    if (alwaysWithDiagonals || (targetPiece != 0 && !Piece.sameTeam(piece, targetPiece)) || (activeEnPassant != null && activeEnPassant.ordinal() == nextSquare))
                         pawnMoves.push(nextSquare);
                 }
             }
@@ -221,9 +235,9 @@ public class Board {
     /*
         Gets knight's move
     */
-    private LinkedList<Integer> getKnightMoves(int square)
+    private ArrayDeque<Integer> getKnightMoves(int square)
     {
-        LinkedList<Integer> knightMoves = new LinkedList<>();
+        ArrayDeque<Integer> knightMoves = new ArrayDeque<>();
         int nextSquare = 0;
 
         int piece = board[square];
@@ -251,9 +265,9 @@ public class Board {
     /*
         gets king's regular move (without castle)
     */
-    private LinkedList<Integer> getKingMoves(int square)
+    private ArrayDeque<Integer> getKingMoves(int square)
     {
-        LinkedList<Integer> kingMoves = new LinkedList<>();
+        ArrayDeque<Integer> kingMoves = new ArrayDeque<>();
         int nextSquare = 0;
         int piece = board[square];
 
@@ -281,7 +295,7 @@ public class Board {
     /*
         Adds the possibility to castle (if possible) to pre-existing king moves
     */
-    private void addCastleMove(int square, LinkedList<Integer> kingMoves)
+    private void addCastleMove(int square, ArrayDeque<Integer> kingMoves)
     {
         int piece = board[square];
         boolean isWhite = Piece.isWhite(piece);
@@ -298,9 +312,9 @@ public class Board {
     /*
         get bishop's pseudo legal moves
     */
-    private LinkedList<Integer> getBishopMoves(int targetSquare)
+    private ArrayDeque<Integer> getBishopMoves(int targetSquare)
     {
-        LinkedList<Integer> bishopMoves = new LinkedList<>();
+        ArrayDeque<Integer> bishopMoves = new ArrayDeque<>();
 
         int targetRank = targetSquare/8;
         int targetFile = targetSquare%8;
@@ -344,9 +358,9 @@ public class Board {
     /*
         Gets rook's pseudo legal moves
     */
-    private LinkedList<Integer> getRookMoves(int targetSquare)
+    private ArrayDeque<Integer> getRookMoves(int targetSquare)
     {
-        LinkedList<Integer> rookMoves = new LinkedList<>();
+        ArrayDeque<Integer> rookMoves = new ArrayDeque<>();
 
         int targetRank = targetSquare/8;
         int targetFile = targetSquare%8;
@@ -390,9 +404,9 @@ public class Board {
     /*
         Gets queen's pseudo legal moves
     */
-    private LinkedList<Integer> getQueenMoves(int square)
+    private ArrayDeque<Integer> getQueenMoves(int square)
     {
-        LinkedList<Integer> queenMoves = new LinkedList<>();
+        ArrayDeque<Integer> queenMoves = new ArrayDeque<>();
         
         queenMoves.addAll(getRookMoves(square));
         queenMoves.addAll(getBishopMoves(square));
@@ -504,6 +518,8 @@ public class Board {
 
             if (piece == 0) blank++;
         }
+
+        if (blank != 0) fen += blank;
 
         fen += " " + (whiteTurn ? "w" : "b") + " "; // who's turn
 
@@ -617,10 +633,15 @@ public class Board {
             loadFen(fenHistory.pop());
     }
 
+    public int perft(int depth, boolean quiet)
+    {
+        return perft(depth, depth, quiet);
+    }
+
     /*
         Returns the number of makeable moves at a given board, for a given depth
     */
-    public int perft(int depth, int initialDepth)
+    private int perft(int depth, int initialDepth, boolean quiet)
     {
         if (depth == 0) { // Won't go too further
             return 1;
@@ -632,17 +653,17 @@ public class Board {
 
             if (board[square] == 0) continue; // for each pieces on the board
 
-            LinkedList<Integer> legalMoves = getLegalMoves(square); // we get the legal moves
+            ArrayDeque<Integer> legalMoves = getLegalMoves(square); // we get the legal moves
     
             for (int move : legalMoves) { // And for each of them
 
                 boolean isWhite = Piece.isWhite(board[square]);
                 if ((Piece.removeColorFromData(board[square]) == Piece.PAWN) && move / 8 == (isWhite ? 0 : 7)) {
-                for (int possiblePromotion : Piece.promotionPossibilities) { // if it's a pawn promoting, we do every promotion
+                    for (int possiblePromotion : Piece.promotionPossibilities) { // if it's a pawn promoting, we do every promotion
                         makeMove(square, move, possiblePromotion - (isWhite ? Piece.WHITE : Piece.BLACK)); // we promote the pawn and play the move
-                        int nodes = perft(depth-1, initialDepth); // count the possibilities
+                        int nodes = perft(depth-1, initialDepth, quiet); // count the possibilities
 
-                        if (depth == initialDepth)
+                        if (!quiet && depth == initialDepth)
                             perftInfo.push("" + Coordinate.of(square) + Coordinate.of(move) + (char)possiblePromotion + ": " + nodes);
 
                         totalMoves += nodes;
@@ -650,9 +671,9 @@ public class Board {
                     }
                 } else {
                     makeMove(square, move, board[square]); // make the move
-                    int nodes = perft(depth-1, initialDepth);
+                    int nodes = perft(depth-1, initialDepth, quiet);
 
-                    if (depth == initialDepth)
+                    if (!quiet && depth == initialDepth)
                         perftInfo.push("" + Coordinate.of(square) + Coordinate.of(move) + ": " + nodes);
 
                     totalMoves += nodes; // count the possibilities

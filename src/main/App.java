@@ -1,7 +1,5 @@
 package main;
 
-import java.util.Collections;
-
 import javax.swing.JFrame;
 
 import coregame.Board;
@@ -79,7 +77,7 @@ public final class App implements Runnable
         if (board != null) board.unMakeMove();
     }
 
-    static void performanceTest(int minDepth, int maxDepth, int p)
+    static void performanceTest(int depth, int p, boolean quiet, boolean startMessage)
     {
         boolean validPosition = (p >= 0 && p < 6);
         
@@ -99,31 +97,29 @@ public final class App implements Runnable
 
         board.getPerftInfo().clear();
 
-        if (validPosition)
+        if (validPosition && startMessage)
             System.out.printf("Performance test, position %d, %s\n", p, Board.positions[p]);
 
-        for (int depth = minDepth; depth <= maxDepth; depth++)
+        
+        long beginning = System.currentTimeMillis();
+        int nodes = board.perft(depth, quiet);
+        long end = System.currentTimeMillis();
+
+        String info = String.format("depth %2d : %10d possibilities in %10dms", depth, nodes, end - beginning);
+
+        if (validPosition && depth < Board.nodes[p].length)
         {
-            long beginning = System.currentTimeMillis();
-            int nodes = board.perft(depth, depth);
-            long end = System.currentTimeMillis();
-
-            String info = String.format("depth %2d : %10d possibilities in %10dms", depth, nodes, end - beginning);
-
-            if (validPosition && depth < Board.nodes[p].length)
-            {
-                int expectedNodes = Board.nodes[p][depth];
-                boolean success = expectedNodes == nodes;
-                System.out.printf("%s %c %s\n", info, success ? '✅' : '❌', success ? "" : String.format("expected %d nodes", expectedNodes));
-            }
-            else
-                System.out.println(info);
+            int expectedNodes = Board.nodes[p][depth];
+            boolean success = expectedNodes == nodes;
+            System.out.printf("%s %c %s\n", info, success ? '✅' : '❌', success ? "" : String.format("expected %d nodes", expectedNodes));
         }
-
-        Collections.sort(board.getPerftInfo());
-
-        for (String info : board.getPerftInfo())
+        else
             System.out.println(info);
+
+        // Collections.sort(board.getPerftInfo());
+
+        for (String s : board.getPerftInfo())
+            System.out.println(s);
     }
 
     static void stayOnTop()

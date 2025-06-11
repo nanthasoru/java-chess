@@ -7,7 +7,7 @@ import java.awt.image.BufferedImage;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.LinkedList;
+import java.util.ArrayDeque;
 
 import javax.imageio.ImageIO;
 import javax.swing.JPanel;
@@ -29,7 +29,7 @@ class Panel extends JPanel{
     private int lastSquare, x, y;
     private BufferedImage lastImage;
     private Board board;
-    private LinkedList<Integer> moves;
+    private ArrayDeque<Integer> moves;
     private boolean attacksHighlight, slide, kingHighlight;
 
     Panel(String fen, App key) throws IllegalArgumentException
@@ -150,6 +150,8 @@ class Panel extends JPanel{
             // Moving piece handling
             board.makeMove(lastSquare, square, Piece.QUEEN - (Piece.isWhite(board.get(lastSquare)) ? Piece.WHITE : Piece.BLACK));
             moves = null;
+
+            if (board.checkMate()) System.out.println("\n\nCheckmate!\n");
         } else if (square != lastSquare) {
             moves = null;
         }

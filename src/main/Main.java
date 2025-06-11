@@ -2,6 +2,8 @@ package main;
 
 import java.util.Scanner;
 
+import coregame.Board;
+
 public final class Main {
 
     public static final Scanner input = new Scanner(System.in);
@@ -38,8 +40,20 @@ public final class Main {
                 App.requestUndo();
                 break;
             case "perft":
-                String position = ask("Position in range [0, 5] (blank for current board fen): ");
-                App.performanceTest(Integer.parseInt(ask("Min depth : ")), Integer.parseInt(ask("Max depth : ")), position.isBlank() ? -1 : Integer.parseInt(position));
+                try {
+                    String position = ask("Position in range [0, 5] (see 'help' command)\nor leave the field blank if you're testing the current active board : ");
+                    App.performanceTest(Integer.parseInt(ask("depth : ")), position.isBlank() ? -1 : Integer.parseInt(position), false, true);
+                } catch (Exception e) {}
+                break;
+            case "allperft":
+                for (int p = 0; p < Board.positions.length; p++)
+                {
+                    for (int depth = 1; depth < Board.nodes[p].length - 1; depth++)
+                    {
+                        App.performanceTest(depth, p, true, depth == 1);
+                    }
+                }
+                App.close();
                 break;
             case "quit":
                 App.close();
@@ -53,38 +67,40 @@ public final class Main {
                 System.out.println("""
                         Lists of commands to interact with the chess game.
 
-                        build : asks for a Forsyth-Edwards Notation and creates a new board with it if valid.
+                        build    : asks for a Forsyth-Edwards Notation and creates a new board with it if valid.
 
-                        stop  : closes the current board if active
+                        stop     : closes the current board if active
 
-                        hide  : removes all highlighting
+                        hide     : removes all highlighting
 
-                        show  : highlights everything
+                        show     : highlights everything
 
-                        reset : sets highlighting back to default
+                        reset    : sets highlighting back to default
 
-                        fen   : prints in the current working terminal a FEN notation of the current board
+                        fen      : prints in the current working terminal a FEN notation of the current board
 
-                        perft : runs a performance test
+                        perft    : runs a performance test
 
-                        unmake: undo the last move
+                        unmake   : undo the last move
 
-                        quit  : do as the commands says
+                        quit     : do as the commands says
 
-                        toggle: Window stays/won't stay on top
+                        toggle   : Window stays/won't stay on top
 
-                        perft : runs a performance test, if the specified position index is out of range, it runs the performance test on the current board
+                        perft    : runs a performance test, if the specified position index is out of range, it runs the performance test on the current board
 
-                                positions (from 0 to 5) (can't gp past depth 5 on these)
+                                   positions (from 0 to 5) (can't gp past depth 5 on these)
 
-                                rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-                                r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
-                                8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
-                                r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1
-                                rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8
-                                r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10"
+                                   rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+                                   r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+                                   8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+                                   r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1
+                                   rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8
+                                   r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10"
 
-                        help  : this command
+                        allperft : runs all 6 perft from depth 0 to depth 5 (WARNING this might take a long time)
+
+                        help     : this command
                         """);
                 break;
             default:
@@ -100,7 +116,7 @@ public final class Main {
     }
 
     public static void main(String[] args)
-    {
+    {        
         String command = "";
 
         while (!command.equals("quit"))
