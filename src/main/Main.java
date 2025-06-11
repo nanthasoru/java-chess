@@ -117,14 +117,12 @@ public final class Main {
 
     public static void main(String[] args)
     {        
-        /* String command = "";
+        String command = "";
 
         while (!command.equals("quit"))
         {
             command = ask("<chess>$ ");
             if (!command.isBlank()) eval(command);
-        } */
-
-        eval("allperft");
+        }
     }
 }
