@@ -300,13 +300,11 @@ public class Board {
         int piece = board[square];
         boolean isWhite = Piece.isWhite(piece);
 
-        if (isSquareAttacked(square, !isWhite)) return; // check ? can't castle
+        if (isSquareAttacked(square, !isWhite) || square%8 != 4) return; // check ? can't castle
 
-        if (((isWhite ? castleRights[0] || castleRights[1] : castleRights[2] || castleRights[3]) && square%8 == 4)) // already, castled ? rook moved ? a square between the rook and the king is attacked ? or is not empty ? can't castle
-        {
-            if (board[square+1] == 0 && board[square+2] == 0 && !isSquareAttacked(square+1, !isWhite) && !isSquareAttacked(square+2, !isWhite) && Piece.removeColorFromData(board[square+3]) == Piece.ROOK && Piece.sameTeam(board[square], board[square+3])) kingMoves.push(square+2);
-            if (board[square-1] == 0 && board[square-2] == 0 && board[square-3] == 0 && !isSquareAttacked(square-1, !isWhite) && !isSquareAttacked(square-2, !isWhite) && Piece.removeColorFromData(board[square-4]) == Piece.ROOK && Piece.sameTeam(board[square], board[square-4])) kingMoves.push(square-2);
-        } 
+        // already, castled ? rook moved ? a square between the rook and the king is attacked ? or is not empty ? can't castle
+        if ((isWhite ? castleRights[0] : castleRights[2]) &&  board[square+1] == 0 && board[square+2] == 0 && !isSquareAttacked(square+1, !isWhite) && !isSquareAttacked(square+2, !isWhite) && Piece.removeColorFromData(board[square+3]) == Piece.ROOK && Piece.sameTeam(board[square], board[square+3])) kingMoves.push(square+2);
+        if ((isWhite ? castleRights[1] : castleRights[3]) &&  board[square-1] == 0 && board[square-2] == 0 && board[square-3] == 0 && !isSquareAttacked(square-1, !isWhite) && !isSquareAttacked(square-2, !isWhite) && Piece.removeColorFromData(board[square-4]) == Piece.ROOK && Piece.sameTeam(board[square], board[square-4])) kingMoves.push(square-2);
     }
 
     /*
@@ -567,7 +565,17 @@ public class Board {
             if (rawPiece == Piece.ROOK)
             {
                 // if a rook is moving then he loses his ability to castle with his king
-                castleRights[isWhite ? (file == 7 ? 0 : 1) : (file == 7 ? 2 : 3)] = false;
+                if (isWhite)
+                {
+                    if (squareB%8 == 7) castleRights[0] = false;
+                    if (squareB%8 == 0) castleRights[1] = false;
+                }
+
+                else
+                {
+                    if (squareB%8 == 7) castleRights[2] = false;
+                    if (squareB%8 == 0) castleRights[3] = false;
+                }
             }
 
             if (rawPiece == Piece.KING)

@@ -1,36 +1,37 @@
+mer. 11 juin 2025 22:29:07 CEST
 Performance test, position 0, rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-depth  1 :         20 possibilities in          8ms ✅ 
-depth  2 :        400 possibilities in         20ms ✅ 
-depth  3 :       8902 possibilities in        132ms ✅ 
-depth  4 :     197281 possibilities in        549ms ✅ 
-depth  5 :    4865609 possibilities in       9875ms ✅ 
+depth  1 :         20 possibilities in         11ms ✅ 
+depth  2 :        400 possibilities in         21ms ✅ 
+depth  3 :       8902 possibilities in        122ms ✅ 
+depth  4 :     197281 possibilities in        604ms ✅ 
+depth  5 :    4865609 possibilities in       9666ms ✅ 
 Performance test, position 1, r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1
 depth  1 :         48 possibilities in          0ms ✅ 
 depth  2 :       2039 possibilities in          5ms ✅ 
-depth  3 :      97862 possibilities in        209ms ✅ 
-depth  4 :    4085603 possibilities in       9087ms ✅ 
-depth  5 :  193692441 possibilities in     400965ms ❌ expected 193690690 nodes
+depth  3 :      97862 possibilities in        222ms ✅ 
+depth  4 :    4085603 possibilities in       8665ms ✅ 
+depth  5 :  193690690 possibilities in     395700ms ✅ 
 Performance test, position 2, 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
 depth  1 :         14 possibilities in          0ms ✅ 
-depth  2 :        191 possibilities in          0ms ✅ 
+depth  2 :        191 possibilities in          1ms ✅ 
 depth  3 :       2812 possibilities in          4ms ✅ 
-depth  4 :      43238 possibilities in         59ms ✅ 
-depth  5 :     674624 possibilities in        865ms ✅ 
+depth  4 :      43238 possibilities in         61ms ✅ 
+depth  5 :     674624 possibilities in        873ms ✅ 
 Performance test, position 3, r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1
 depth  1 :          6 possibilities in          0ms ✅ 
-depth  2 :        264 possibilities in          1ms ✅ 
-depth  3 :       9467 possibilities in         19ms ✅ 
-depth  4 :     422333 possibilities in        796ms ✅ 
-depth  5 :   15833292 possibilities in      32372ms ✅ 
+depth  2 :        264 possibilities in          0ms ✅ 
+depth  3 :       9467 possibilities in         20ms ✅ 
+depth  4 :     422333 possibilities in        813ms ✅ 
+depth  5 :   15833292 possibilities in      32798ms ✅ 
 Performance test, position 4, rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8
 depth  1 :         44 possibilities in          0ms ✅ 
 depth  2 :       1486 possibilities in          3ms ✅ 
-depth  3 :      62379 possibilities in        114ms ✅ 
-depth  4 :    2103487 possibilities in       4063ms ✅ 
-depth  5 :   89941194 possibilities in     171369ms ✅ 
+depth  3 :      62379 possibilities in        125ms ✅ 
+depth  4 :    2103487 possibilities in       4227ms ✅ 
+depth  5 :   89941194 possibilities in     170880ms ✅ 
 Performance test, position 5, r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10
 depth  1 :         46 possibilities in          0ms ✅ 
-depth  2 :       2079 possibilities in          5ms ✅ 
-depth  3 :      89890 possibilities in        187ms ✅ 
-depth  4 :    3894594 possibilities in       8245ms ✅ 
-depth  5 :  164075551 possibilities in     447633ms ✅ 
+depth  2 :       2079 possibilities in          4ms ✅ 
+depth  3 :      89890 possibilities in        186ms ✅ 
+depth  4 :    3894594 possibilities in       8185ms ✅ 
+depth  5 :  164075551 possibilities in     339300ms ✅ 

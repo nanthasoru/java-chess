@@ -48,7 +48,7 @@ public final class Main {
             case "allperft":
                 for (int p = 0; p < Board.positions.length; p++)
                 {
-                    for (int depth = 1; depth < Board.nodes[p].length - 1; depth++)
+                    for (int depth = 1; depth < Board.nodes[p].length; depth++)
                     {
                         App.performanceTest(depth, p, true, depth == 1);
                     }
@@ -117,12 +117,14 @@ public final class Main {
 
     public static void main(String[] args)
     {        
-        String command = "";
+        /* String command = "";
 
         while (!command.equals("quit"))
         {
             command = ask("<chess>$ ");
             if (!command.isBlank()) eval(command);
-        }
+        } */
+
+        eval("allperft");
     }
 }
