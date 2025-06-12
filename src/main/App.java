@@ -3,6 +3,7 @@ package main;
 import javax.swing.JFrame;
 
 import coregame.Board;
+import testdata.Data;
 
 public final class App implements Runnable
 {
@@ -32,7 +33,7 @@ public final class App implements Runnable
 
         try {
             sub = new App();
-            gamePanel = new Panel(fen == null || fen.isEmpty() ? Board.positions[0] : fen, sub);
+            gamePanel = new Panel(fen == null || fen.isEmpty() ? Data.positions[0] : fen, sub);
             board = gamePanel.getBoard(sub);
         } catch (IllegalArgumentException e) {
             gamePanel = null;
@@ -79,14 +80,14 @@ public final class App implements Runnable
 
     static void performanceTest(int depth, int p, boolean quiet, boolean startMessage)
     {
-        boolean validPosition = (p >= 0 && p < 6);
+        boolean validPosition = (p >= 0 && p < Data.positions.length);
         
         if (validPosition)
         {
             if (beta != null && beta.isAlive())
-                board.loadFen(Board.positions[p]);
+                board.loadFen(Data.positions[p]);
             else
-                App.build(Board.positions[p]);
+                App.build(Data.positions[p]);
         }
 
         if (beta == null || !beta.isAlive())
@@ -98,7 +99,7 @@ public final class App implements Runnable
         board.getPerftInfo().clear();
 
         if (validPosition && startMessage)
-            System.out.printf("Performance test, position %d, %s\n", p, Board.positions[p]);
+            System.out.printf("Performance test, position %d, %s\n", p, Data.positions[p]);
 
         
         long beginning = System.currentTimeMillis();
@@ -107,9 +108,9 @@ public final class App implements Runnable
 
         String info = String.format("depth %2d : %10d possibilities in %10dms", depth, nodes, end - beginning);
 
-        if (validPosition && depth < Board.nodes[p].length)
+        if (validPosition && depth < Data.nodes[p].length)
         {
-            int expectedNodes = Board.nodes[p][depth];
+            int expectedNodes = Data.nodes[p][depth];
             boolean success = expectedNodes == nodes;
             System.out.printf("%s %c %s\n", info, success ? '✅' : '❌', success ? "" : String.format("expected %d nodes", expectedNodes));
         }

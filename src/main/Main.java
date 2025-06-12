@@ -2,7 +2,7 @@ package main;
 
 import java.util.Scanner;
 
-import coregame.Board;
+import testdata.Data;
 
 public final class Main {
 
@@ -46,9 +46,9 @@ public final class Main {
                 } catch (Exception e) {}
                 break;
             case "allperft":
-                for (int p = 0; p < Board.positions.length; p++)
+                for (int p = 0; p < Data.positions.length; p++)
                 {
-                    for (int depth = 1; depth < Board.nodes[p].length; depth++)
+                    for (int depth = 1; depth < Data.nodes[p].length; depth++)
                     {
                         App.performanceTest(depth, p, true, depth == 1);
                     }
