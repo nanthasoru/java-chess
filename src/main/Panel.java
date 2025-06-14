@@ -129,7 +129,7 @@ class Panel extends JPanel{
                 moves = board.getLegalMoves(square, false);
                 lastSquare = square;
             }
-            else
+            else if (moves == null || !moves.contains(square))
             {
                 opponentMoves = board.getPseudoLegalMoves(square, false, false);
                 if (Piece.removeColorFromData(board.get(square)) == Piece.KING) board.addCastleMove(square, opponentMoves);
