@@ -11,7 +11,7 @@ public final class App implements Runnable
     private boolean running;
 
     private static JFrame gameFrame;
-    public static Panel gamePanel;
+    private static Panel gamePanel;
 
     private static App sub;
     private static Thread beta;
@@ -49,6 +49,7 @@ public final class App implements Runnable
         Inputs inputs = new Inputs();
         gamePanel.addMouseListener(inputs);
         gamePanel.addMouseMotionListener(inputs);
+        gamePanel.addKeyListener(inputs);
         gamePanel.requestFocus();
         
         gameFrame.setLocationRelativeTo(null);
@@ -158,5 +159,27 @@ public final class App implements Runnable
                 lastFrame = now;
             }
         }
+    }
+
+    static void choosePiece(int rank, int file)
+    {
+        int square = rank * 8 + file;
+
+        if (square >= 0 && square < 64)
+            gamePanel.setActiveSquare(square);
+    }
+
+    static void dragPiece(int x, int y)
+    {
+        gamePanel.setSlide(true);
+        gamePanel.setXY(x, y);
+    }
+
+    static void dropPiece(int rank, int file)
+    {
+        gamePanel.setSlide(false);
+        int square = rank * 8 + file;
+        if (square >= 0 && square < 64)
+            gamePanel.putPiece(square);
     }
 }

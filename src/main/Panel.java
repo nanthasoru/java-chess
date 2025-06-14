@@ -21,7 +21,8 @@ class Panel extends JPanel{
         BEIGE = new Color(250, 235, 195),
         BROWN = new Color(204, 138, 94),
         RED = new Color(235, 64, 52, 150),
-        GREEN = new Color(121, 232, 150, 150);
+        GREEN = new Color(121, 232, 150, 150),
+        BLUE = new Color(57, 61, 250, 150);
 
     private final static BufferedImage[] pieceImages = new BufferedImage[12];
     private final App password;
@@ -29,7 +30,7 @@ class Panel extends JPanel{
     private int lastSquare, x, y;
     private BufferedImage lastImage;
     private Board board;
-    private ArrayDeque<Integer> moves;
+    private ArrayDeque<Integer> moves, opponentMoves;
     private boolean attacksHighlight, slide, kingHighlight;
 
     Panel(String fen, App key) throws IllegalArgumentException
@@ -40,6 +41,7 @@ class Panel extends JPanel{
         attacksHighlight = true;
         kingHighlight = false;
         board = new Board(fen);
+        lastSquare = -1;
     }
 
     public void setSlide(boolean slide) {
@@ -90,6 +92,12 @@ class Panel extends JPanel{
                     g.fillRect(file * 100, rank * 100, 100, 100);
                 }
 
+                if (attacksHighlight && opponentMoves != null && opponentMoves.contains(square))
+                {
+                    g.setColor(BLUE);
+                    g.fillRect(file * 100, rank * 100, 100, 100);
+                }
+
                 if (kingHighlight && (board.getBlackKingSquare() == square || board.getWhiteKingSquare() == square))
                 {
                     g.setColor(GREEN);
@@ -98,7 +106,7 @@ class Panel extends JPanel{
             }
         }
 
-        if (slide) {
+        if (slide && lastSquare != -1) {
             if (lastImage == null) lastImage = evalImage(board.get(lastSquare));
             g.drawImage(lastImage, x - 50, y - 50, 100, 100, null);
         }
@@ -106,6 +114,46 @@ class Panel extends JPanel{
         if (!slide) {
             lastImage = null;
         }
+    }
+
+    void setActiveSquare(int square)
+    {
+        if (board.get(square) == 0 && moves != null && moves.contains(square))
+            putPiece(square);
+
+        else if (board.get(square) == 0)
+            callClear();
+        else
+        {
+            if (Piece.isWhite(board.get(square)) == board.whitePlaying()) {
+                moves = board.getLegalMoves(square, false);
+                lastSquare = square;
+            }
+            else
+            {
+                opponentMoves = board.getPseudoLegalMoves(square, false, false);
+                if (Piece.removeColorFromData(board.get(square)) == Piece.KING) board.addCastleMove(square, opponentMoves);
+            }
+        }
+    }
+
+    void callClear()
+    {
+        opponentMoves = null;
+        moves = null;
+        lastSquare = -1;
+    }
+
+    void putPiece(int square)
+    {
+        if (moves != null && lastSquare != -1 && moves.contains(square) && Piece.isWhite(board.get(lastSquare)) == board.whitePlaying())
+        {
+            board.makeMove(lastSquare, square, Piece.QUEEN - (Piece.isWhite(board.get(lastSquare)) ? Piece.WHITE : Piece.BLACK));
+            callClear();
+        }
+
+        if (board.checkMate())
+            System.out.println("Checkmate!");
     }
 
     private BufferedImage evalImage(int piece)
@@ -136,25 +184,6 @@ class Panel extends JPanel{
         }
 
         return pieceImages[index + d];
-    }
-
-    void evalMouseEvent(int y, int x)
-    {
-        int square = y/100 * 8 + x/100;
-
-        if (moves == null && board.get(square) != 0) {
-            moves = board.getLegalMoves(square);
-            lastSquare = square;
-        } else if (moves != null && moves.contains(square)) {
-
-            // Moving piece handling
-            board.makeMove(lastSquare, square, Piece.QUEEN - (Piece.isWhite(board.get(lastSquare)) ? Piece.WHITE : Piece.BLACK));
-            moves = null;
-
-            if (board.checkMate()) System.out.println("\n\nCheckmate!\n");
-        } else if (square != lastSquare) {
-            moves = null;
-        }
     }
 
     static

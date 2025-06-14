@@ -36,6 +36,10 @@ public class Board {
         return perftInfo;
     }
 
+    public boolean whitePlaying() {
+        return whiteTurn;
+    }
+
     private boolean check(boolean whiteToPlay)
     {
         return isSquareAttacked(whiteToPlay ? blackKingSquare : whiteKingSquare, whiteTurn);
@@ -70,7 +74,7 @@ public class Board {
         {
             if (board[square] == 0) continue;
 
-            if (!getLegalMoves(square).isEmpty()) return false;
+            if (!getLegalMoves(square, true).isEmpty()) return false;
         }
 
         return true;
@@ -98,9 +102,9 @@ public class Board {
         };
     }
 
-    public ArrayDeque<Integer> getLegalMoves(int square)
+    public ArrayDeque<Integer> getLegalMoves(int square, boolean strict)
     {
-        ArrayDeque<Integer> pseudoLegalMoves = getPseudoLegalMoves(square, true, false); // first, get pseudo legal moves
+        ArrayDeque<Integer> pseudoLegalMoves = getPseudoLegalMoves(square, strict, false); // first, get pseudo legal moves
 
         // if it's king's move : well let's add castle move
         if (Piece.removeColorFromData(board[square]) == Piece.KING && (whiteTurn == Piece.isWhite(board[square])))
@@ -233,7 +237,7 @@ public class Board {
     /*
         Adds the possibility to castle (if possible) to pre-existing king moves
     */
-    private void addCastleMove(int square, ArrayDeque<Integer> kingMoves)
+    public void addCastleMove(int square, ArrayDeque<Integer> kingMoves)
     {
         int piece = board[square];
         boolean isWhite = Piece.isWhite(piece);
@@ -599,7 +603,7 @@ public class Board {
 
             if (board[square] == 0) continue; // for each pieces on the board
 
-            ArrayDeque<Integer> legalMoves = getLegalMoves(square); // we get the legal moves
+            ArrayDeque<Integer> legalMoves = getLegalMoves(square, true); // we get the legal moves
     
             for (int move : legalMoves) { // And for each of them
 

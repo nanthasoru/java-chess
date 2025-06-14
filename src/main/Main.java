@@ -6,7 +6,7 @@ import testdata.Data;
 
 public final class Main {
 
-    public static final Scanner input = new Scanner(System.in);
+    private static final Scanner input = new Scanner(System.in);
 
     private static void eval(String command)
     {
@@ -41,7 +41,7 @@ public final class Main {
                 break;
             case "perft":
                 try {
-                    String position = ask("Position in range [0, 5] (see 'help' command)\nor leave the field blank if you're testing the current active board : ");
+                    String position = ask("Position in range [0, " + (Data.positions.length - 1) + "] (see 'help' command)\nor leave the field blank if you're testing the current active board : ");
                     App.performanceTest(Integer.parseInt(ask("depth : ")), position.isBlank() ? -1 : Integer.parseInt(position), false, true);
                 } catch (Exception e) {}
                 break;
@@ -77,13 +77,13 @@ public final class Main {
 
                         reset    : sets highlighting back to default
 
-                        fen      : prints in the current working terminal a FEN notation of the current board
+                        fen      : prints in the current working terminal a FEN notation of the current board (or press F)
 
                         perft    : runs a performance test
 
-                        unmake   : undo the last move
+                        unmake   : undo the last move (or press U)
 
-                        quit     : do as the commands says
+                        quit     : do as the commands says (or press Q)
 
                         toggle   : Window stays/won't stay on top
 
